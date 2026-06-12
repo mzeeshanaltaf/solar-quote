@@ -1,0 +1,80 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+}
+
+enum QuoteStatus {
+  UPLOADED
+  EXTRACTED
+  LOCATED
+  ESTIMATED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  SENT_TO_PARTNER
+  CLOSED
+  JUNK
+}
+
+model QuoteSession {
+  id     String      @id @default(cuid())
+  status QuoteStatus @default(UPLOADED)
+
+  // Bill file (Vercel Blob)
+  blobUrl      String?
+  fileMimeType String?
+
+  // Extracted from the bill (Mistral OCR -> GPT structured output)
+  kWhUsed              Float?
+  billAmount           Float?
+  currency             String? // ISO 4217 code as printed on the bill
+  billingPeriodDays    Int?
+  rawAddress           String?
+  utilityName          String?
+  extractionConfidence Json? // per-field confidence scores
+
+  // Location (Google Geocoding + user-confirmed pin)
+  lat              Float?
+  lng              Float?
+  formattedAddress String?
+
+  // Estimate results
+  specificYield       Float? // kWh/kWp/yr from PVGIS or NASA POWER
+  systemKwp           Float?
+  annualProductionKwh Float?
+  annualSavings       Float? // in the bill's own currency
+  paybackYears        Float?
+  estimateJson        Json? // full breakdown incl. 25-yr projection
+
+  lead Lead?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model Lead {
+  id               String     @id @default(cuid())
+  name             String
+  email            String
+  phone            String?
+  preferredContact String? // email | phone | whatsapp
+  notes            String?
+  status           LeadStatus @default(NEW)
+
+  quoteSessionId String       @unique
+  quoteSession   QuoteSession @relation(fields: [quoteSessionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
