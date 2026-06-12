@@ -9,11 +9,17 @@ export default function MarketingLayout({
 }>) {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-border/60">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-6 px-5 py-4 sm:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="size-3 rounded-full bg-primary" aria-hidden="true" />
-            <span className="font-display text-lg">SolarQuote</span>
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-6 px-5 py-3 sm:px-8">
+          <Link href="/" className="flex items-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.svg"
+              alt="SolarQuote"
+              width={1260}
+              height={441}
+              className="h-11 w-auto sm:h-12"
+            />
           </Link>
           <nav
             aria-label="Primary"
