@@ -43,3 +43,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local-only logo source and derivation script (public/logo.svg is committed)
+/public/SolarQuote_Logo.svg
+/scripts/adjust-logo.mjs
