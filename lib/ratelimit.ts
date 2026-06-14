@@ -22,6 +22,16 @@ export const contactRatelimit = redis
     })
   : null;
 
+// Bill upload + extraction hit Vercel Blob, Mistral OCR, and OpenAI — all
+// paid — on anonymous requests, so we gate them harder than the contact form.
+export const extractRatelimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(5, "10 m"),
+      prefix: "ratelimit:extract",
+    })
+  : null;
+
 export function getClientIp(headers: Headers): string {
   const forwarded = headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();

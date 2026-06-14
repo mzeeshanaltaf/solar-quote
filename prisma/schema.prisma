@@ -31,12 +31,19 @@ model QuoteSession {
   blobUrl      String?
   fileMimeType String?
 
-  // Extracted from the bill (Mistral OCR -> GPT structured output)
+  // Extracted from the bill (Mistral OCR -> GPT structured output).
+  // We keep both the full address as printed (best free-text input for Google
+  // Geocoding -> precise pin) and the coarse components (handy for Phase 4
+  // country cost-defaults and Phase 5 lead filtering).
   kWhUsed              Float?
   billAmount           Float?
   currency             String? // ISO 4217 code as printed on the bill
   billingPeriodDays    Int?
-  rawAddress           String?
+  rawAddress           String? // full service address exactly as printed
+  addressTown          String? // town / area / locality
+  addressCity          String? // city
+  addressState         String? // state / province / region
+  addressCountry       String? // country
   utilityName          String?
   extractionConfidence Json? // per-field confidence scores
 

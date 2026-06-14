@@ -37,9 +37,21 @@ npx neonctl@latest branches create --name dev
 npm run dev
 ```
 
+## Bill upload + extraction (Phase 2.1)
+
+The `/estimate` funnel lets a homeowner upload a bill (PDF/JPG/PNG/WebP), preview it,
+and on confirm runs the extraction pipeline: the file is stored in a **private**
+Vercel Blob, OCR'd with **Mistral OCR**, and turned into structured fields
+(kWh, amount, currency, billing period, full + coarse address, utility) by
+**OpenAI `gpt-5.4-mini`** via the AI SDK. The extracted values are shown in an
+editable review card. See [docs/PHASE-2.md](docs/PHASE-2.md).
+
 ## Environment variables
 
-See [.env.example](.env.example). Phase 1 needs only `DATABASE_URL`; later phases add Vercel Blob, Mistral, OpenAI, Google Maps, and Better Auth keys.
+See [.env.example](.env.example). Phase 1 needs only `DATABASE_URL`. **Phase 2.1 also
+requires** `BLOB_READ_WRITE_TOKEN`, `MISTRAL_API_KEY`, and `OPENAI_API_KEY` (optionally
+`OPENAI_EXTRACTION_MODEL` to override the default model, and the `UPSTASH_*` keys for
+rate limiting). Later phases add Google Maps and Better Auth keys.
 
 ## Design system
 

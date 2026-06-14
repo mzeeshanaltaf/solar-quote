@@ -1,32 +1,27 @@
-import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowLeftIcon } from "lucide-react";
+"use client";
 
-import { Button } from "@/components/ui/button";
+import dynamic from "next/dynamic";
 
-export const metadata: Metadata = {
-  title: "Estimate",
-};
+import { Spinner } from "@/components/ui/spinner";
 
-// Phase 2 replaces this stub with the upload -> review -> location -> results funnel.
+// The funnel initializes browser-only state (file uploads, drag/drop, etc.), so
+// we skip SSR entirely to avoid hydration mismatch (see global Next.js
+// guidance). `ssr: false` is only allowed inside a Client Component.
+const EstimateFunnel = dynamic(
+  () =>
+    import("@/components/estimate/estimate-funnel").then((m) => ({
+      default: m.EstimateFunnel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <main className="mx-auto flex w-full max-w-2xl grow items-center justify-center px-5 py-24">
+        <Spinner className="size-6 text-primary" />
+      </main>
+    ),
+  }
+);
+
 export default function EstimatePage() {
-  return (
-    <main className="mx-auto flex w-full max-w-2xl grow flex-col items-start justify-center gap-7 px-5 py-24 sm:px-8">
-      <p className="text-sm font-semibold tracking-[0.18em] text-primary uppercase">
-        Almost ready
-      </p>
-      <h1 className="text-4xl sm:text-5xl">The bill reader is warming up.</h1>
-      <p className="max-w-[52ch] text-lg leading-relaxed text-muted-foreground">
-        This is where you will photograph your bill and watch it turn into a
-        solar estimate. The estimator launches shortly; there is nothing to
-        sign up for in the meantime, so just come back with your latest bill.
-      </p>
-      <Button asChild variant="outline">
-        <Link href="/">
-          <ArrowLeftIcon data-icon="inline-start" />
-          Back to the front page
-        </Link>
-      </Button>
-    </main>
-  );
+  return <EstimateFunnel />;
 }
