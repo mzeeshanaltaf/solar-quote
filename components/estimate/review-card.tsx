@@ -1,8 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2Icon, AlertCircleIcon, RotateCcwIcon } from "lucide-react";
+import {
+  CheckCircle2Icon,
+  AlertCircleIcon,
+  RotateCcwIcon,
+  SparkleIcon,
+} from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import type { ExtractedBill } from "@/lib/bill-schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,14 +97,22 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  // Phase 2.2 turns this into per-field highlighting; for now we just surface
-  // a gentle "double-check" badge on anything the model was unsure about.
+  // Fields the model was unsure about (guessed, ambiguous, or null). We flag
+  // these so the user's eye lands on exactly the figures worth double-checking.
   const lowConfidence = useMemo(() => {
     const c = bill.confidence;
     return new Set<FieldKey>(
       (Object.keys(c) as FieldKey[]).filter((k) => c[k] === "low")
     );
   }, [bill.confidence]);
+  const lowCount = lowConfidence.size;
+
+  // Warm amber treatment that pulls attention to a flagged input without the
+  // alarm of a destructive/red state.
+  const flag = (key: FieldKey) =>
+    lowConfidence.has(key)
+      ? "border-primary/55 bg-primary/5 focus-visible:border-primary focus-visible:ring-primary/25"
+      : undefined;
 
   const handleConfirm = async () => {
     const values = {
@@ -145,6 +159,22 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
       </CardHeader>
 
       <CardContent>
+        {lowCount > 0 && (
+          <Alert className="mb-6 border-primary/30 bg-primary/4 text-foreground">
+            <SparkleIcon className="text-primary" />
+            <AlertTitle>
+              {lowCount === 1
+                ? "One figure worth a second look"
+                : `${lowCount} figures worth a second look`}
+            </AlertTitle>
+            <AlertDescription className="text-muted-foreground">
+              We weren&apos;t fully sure about the highlighted{" "}
+              {lowCount === 1 ? "field" : "fields"} below. Confirm{" "}
+              {lowCount === 1 ? "it" : "they're"} right before continuing.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <FieldGroup>
           <Field orientation="responsive">
             <FieldLabel htmlFor="rev-kwh">
@@ -156,6 +186,7 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
               type="number"
               inputMode="decimal"
               placeholder="e.g. 450"
+              className={flag("kWhUsed")}
               value={form.kWhUsed}
               onChange={set("kWhUsed")}
             />
@@ -171,6 +202,7 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
               type="number"
               inputMode="decimal"
               placeholder="e.g. 120.50"
+              className={flag("billAmount")}
               value={form.billAmount}
               onChange={set("billAmount")}
             />
@@ -185,7 +217,7 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
               id="rev-currency"
               placeholder="e.g. USD"
               maxLength={8}
-              className="uppercase"
+              className={cn("uppercase", flag("currency"))}
               value={form.currency}
               onChange={set("currency")}
             />
@@ -201,6 +233,7 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
               type="number"
               inputMode="numeric"
               placeholder="e.g. 30"
+              className={flag("billingPeriodDays")}
               value={form.billingPeriodDays}
               onChange={set("billingPeriodDays")}
             />
@@ -215,6 +248,7 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
               id="rev-address"
               rows={2}
               placeholder="House / street, area, city, country"
+              className={flag("rawAddress")}
               value={form.rawAddress}
               onChange={set("rawAddress")}
             />
@@ -228,6 +262,7 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
             <Input
               id="rev-town"
               placeholder="e.g. Gulshan-e-Iqbal"
+              className={flag("addressTown")}
               value={form.addressTown}
               onChange={set("addressTown")}
             />
@@ -241,6 +276,7 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
             <Input
               id="rev-city"
               placeholder="e.g. Karachi"
+              className={flag("addressCity")}
               value={form.addressCity}
               onChange={set("addressCity")}
             />
@@ -254,6 +290,7 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
             <Input
               id="rev-state"
               placeholder="e.g. Sindh"
+              className={flag("addressState")}
               value={form.addressState}
               onChange={set("addressState")}
             />
@@ -267,6 +304,7 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
             <Input
               id="rev-country"
               placeholder="e.g. Pakistan"
+              className={flag("addressCountry")}
               value={form.addressCountry}
               onChange={set("addressCountry")}
             />
@@ -280,6 +318,7 @@ export function ReviewCard({ sessionId, bill, onConfirmed, onReset }: ReviewCard
             <Input
               id="rev-utility"
               placeholder="Your electricity provider"
+              className={flag("utilityName")}
               value={form.utilityName}
               onChange={set("utilityName")}
             />

@@ -88,6 +88,7 @@ export async function ocrBill(
 const SYSTEM_PROMPT = `You read residential and commercial electricity bills from anywhere in the world and extract a few structured fields. Bills have no fixed schema, language, or currency.
 
 Rules:
+- FIRST decide whether the document is actually an electricity or utility bill. Set "isElectricityBill" to true only if it is. If it is clearly something else (a different invoice, a receipt, a letter, an ID, a random photo, blank/garbled text), set "isElectricityBill" to false, write a short friendly "rejectionReason" describing what it looks like instead, and set every other field to null. When it IS a bill, set "rejectionReason" to null.
 - Extract ONLY what is actually printed on the bill. If a field is not present, return null for it — never guess or fabricate a value.
 - "currency" must be the ISO 4217 code (USD, EUR, GBP, PKR, INR, AUD, ...). Infer it from the currency symbol, language, and address if not stated explicitly.
 - "kWhUsed" is the electricity consumed during this billing period in kWh. Convert units if the bill uses MWh or units (1 unit = 1 kWh in most regions).

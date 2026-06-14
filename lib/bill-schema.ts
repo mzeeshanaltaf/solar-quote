@@ -8,6 +8,17 @@ export const ConfidenceSchema = z.enum(["low", "medium", "high"]);
 export type Confidence = z.infer<typeof ConfidenceSchema>;
 
 export const ExtractedBillSchema = z.object({
+  isElectricityBill: z
+    .boolean()
+    .describe(
+      "True only if this document is a residential or commercial electricity/utility bill. False for anything else (invoice, receipt, letter, ID, random photo)."
+    ),
+  rejectionReason: z
+    .string()
+    .nullable()
+    .describe(
+      "When isElectricityBill is false, a short, friendly explanation of what the document looks like instead. Null when it is a bill."
+    ),
   kWhUsed: z
     .number()
     .nullable()

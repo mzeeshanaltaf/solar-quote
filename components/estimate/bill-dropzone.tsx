@@ -1,14 +1,25 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useDropzone, type FileRejection } from "react-dropzone";
-import { UploadCloudIcon, FileTextIcon, AlertCircleIcon } from "lucide-react";
+import {
+  UploadCloudIcon,
+  FileTextIcon,
+  CameraIcon,
+  AlertCircleIcon,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const MAX_BYTES = 10 * 1024 * 1024;
+const ALLOWED_MIME = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 const ACCEPT = {
   "application/pdf": [".pdf"],
   "image/jpeg": [".jpg", ".jpeg"],
@@ -24,6 +35,7 @@ interface BillDropzoneProps {
 
 export function BillDropzone({ onFile, disabled, error }: BillDropzoneProps) {
   const [localError, setLocalError] = useState<string | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const onDrop = useCallback(
     (accepted: File[], rejected: FileRejection[]) => {
@@ -38,6 +50,28 @@ export function BillDropzone({ onFile, disabled, error }: BillDropzoneProps) {
         return;
       }
       if (accepted[0]) onFile(accepted[0]);
+    },
+    [onFile]
+  );
+
+  // The camera capture uses a separate input so the main picker can stay a
+  // plain file chooser — on phones, `capture` on the shared input would force
+  // the camera and block picking an existing photo.
+  const onCameraChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setLocalError(null);
+      const file = e.target.files?.[0];
+      e.target.value = ""; // allow re-selecting the same shot
+      if (!file) return;
+      if (!ALLOWED_MIME.has(file.type)) {
+        setLocalError("Unsupported file. Upload a PDF, JPG, PNG, or WebP.");
+        return;
+      }
+      if (file.size > MAX_BYTES) {
+        setLocalError("That file is over the 10 MB limit. Try a smaller scan or photo.");
+        return;
+      }
+      onFile(file);
     },
     [onFile]
   );
@@ -65,9 +99,20 @@ export function BillDropzone({ onFile, disabled, error }: BillDropzoneProps) {
           disabled && "pointer-events-none opacity-60"
         )}
       >
-        {/* Mobile camera capture + file picker. The accept/capture attributes
-            steer phones toward the camera; react-dropzone owns the rest. */}
-        <input {...getInputProps()} capture="environment" />
+        {/* Plain file picker (no `capture`) so phones offer gallery + files,
+            not just the camera. The "Take a photo" button below owns capture. */}
+        <input {...getInputProps()} />
+
+        {/* Dedicated camera input — `capture="environment"` opens the rear
+            camera on phones; ignored (harmless) on desktop. */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={onCameraChange}
+        />
 
         <div className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
           <UploadCloudIcon className="size-7" />
@@ -83,10 +128,27 @@ export function BillDropzone({ onFile, disabled, error }: BillDropzoneProps) {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2.5">
-          <Button type="button" onClick={open} disabled={disabled}>
+        <div className="flex w-full flex-col items-center justify-center gap-2.5 sm:w-auto sm:flex-row sm:flex-wrap">
+          <Button
+            type="button"
+            onClick={open}
+            disabled={disabled}
+            className="w-full sm:w-auto"
+          >
             <FileTextIcon data-icon="inline-start" />
             Choose a file
+          </Button>
+          {/* Camera capture is the dominant path on mobile, so give it its own
+              first-class button rather than burying it in the file picker. */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={disabled}
+            className="w-full sm:w-auto"
+          >
+            <CameraIcon data-icon="inline-start" />
+            Take a photo
           </Button>
         </div>
 

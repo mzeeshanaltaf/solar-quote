@@ -37,14 +37,27 @@ npx neonctl@latest branches create --name dev
 npm run dev
 ```
 
-## Bill upload + extraction (Phase 2.1)
+## Bill upload + extraction (Phase 2.1 + 2.2)
 
 The `/estimate` funnel lets a homeowner upload a bill (PDF/JPG/PNG/WebP), preview it,
-and on confirm runs the extraction pipeline: the file is stored in a **private**
-Vercel Blob, OCR'd with **Mistral OCR**, and turned into structured fields
-(kWh, amount, currency, billing period, full + coarse address, utility) by
-**OpenAI `gpt-5.4-mini`** via the AI SDK. The extracted values are shown in an
-editable review card. See [docs/PHASE-2.md](docs/PHASE-2.md).
+and on confirm runs a **three-stage pipeline** — each its own request so the progress
+dialog reflects real work:
+
+1. **`POST /api/upload`** — stores the file in a **private** Vercel Blob and creates the
+   `QuoteSession`.
+2. **`POST /api/ocr`** — OCRs the bill with **Mistral OCR** and persists the markdown on
+   the session (so retries don't pay for OCR twice).
+3. **`POST /api/extract`** — turns that markdown into structured fields (kWh, amount,
+   currency, billing period, full + coarse address, utility) with **OpenAI
+   `gpt-5.4-mini`** via the AI SDK. The same call also classifies whether the document is
+   actually an electricity bill; if not, it returns a typed `not_a_bill` error.
+
+The extracted values land in an editable **review card** that highlights any low-confidence
+fields. Phase 2.2 adds the resilience layer: a **manual-entry fallback** (`POST /api/session`)
+for users with no readable bill, hardened error/retry states (OCR vs. extraction vs.
+rate-limit), and mobile camera capture. The funnel never dead-ends. See
+[docs/PHASE-2.md](docs/PHASE-2.md) and the manual test matrix in
+[docs/test-corpus.md](docs/test-corpus.md).
 
 ## Environment variables
 

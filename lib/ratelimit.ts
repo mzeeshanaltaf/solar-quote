@@ -32,6 +32,18 @@ export const extractRatelimit = redis
     })
   : null;
 
+// Manual entry / session edits only touch the database (no paid APIs), so this
+// is more generous than the extract limiter — it must never block a legitimate
+// fallback from a user whose extraction just failed (and already spent their
+// extract budget). Kept separate so the two windows don't share a counter.
+export const sessionRatelimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(20, "10 m"),
+      prefix: "ratelimit:session",
+    })
+  : null;
+
 export function getClientIp(headers: Headers): string {
   const forwarded = headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();

@@ -1,23 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { get } from "@vercel/blob";
 import { z } from "zod";
 
 import { QuoteStatus } from "@/generated/client";
 import { prisma } from "@/lib/prisma";
-import { extractRatelimit, getClientIp } from "@/lib/ratelimit";
+import { sessionRatelimit, getClientIp } from "@/lib/ratelimit";
 import {
   ExtractionError,
   extractFields,
-  ocrBill,
   type ExtractedBill,
 } from "@/lib/extraction";
 
 const ERROR_STATUS: Record<string, number> = {
   parse: 400,
   not_found: 404,
-  no_file: 409,
+  no_ocr: 409,
+  not_a_bill: 422,
   rate: 429,
-  ocr_failed: 502,
   extraction_failed: 502,
   server: 500,
 };
@@ -25,27 +23,35 @@ const ERROR_STATUS: Record<string, number> = {
 const ERROR_MESSAGES: Record<string, string> = {
   parse: "Invalid request.",
   not_found: "We couldn't find that upload. Please start over.",
-  no_file: "No bill is attached to this session.",
+  no_ocr: "We haven't read this bill yet. Please start over.",
+  not_a_bill:
+    "That doesn't look like an electricity bill. Check you uploaded the right file, or enter your numbers yourself.",
   rate: "Too many requests from your connection. Please wait a few minutes.",
-  ocr_failed: "We couldn't read your bill. You can enter the numbers yourself.",
   extraction_failed:
     "We read your bill but couldn't pull the figures out. You can enter them yourself.",
   server: "Something went wrong. Please try again.",
 };
 
-function fail(code: string) {
+function fail(code: string, message?: string) {
   return NextResponse.json(
-    { success: false, error: code, message: ERROR_MESSAGES[code] ?? ERROR_MESSAGES.server },
+    {
+      success: false,
+      error: code,
+      message: message ?? ERROR_MESSAGES[code] ?? ERROR_MESSAGES.server,
+    },
     { status: ERROR_STATUS[code] ?? 500 }
   );
 }
 
 const postSchema = z.object({ sessionId: z.string().min(1) });
 
-// POST { sessionId } — OCR the stored bill, extract fields, persist them.
+// POST { sessionId } — extract structured fields from the OCR markdown that
+// /api/ocr already persisted, classify whether it's really a bill, persist the
+// figures. No OCR here, so a failed extraction can retry cheaply.
 export async function POST(req: NextRequest) {
-  if (extractRatelimit) {
-    const { success } = await extractRatelimit.limit(getClientIp(req.headers));
+  // Light guard: the LLM call is paid, and this can be retried on one session.
+  if (sessionRatelimit) {
+    const { success } = await sessionRatelimit.limit(getClientIp(req.headers));
     if (!success) return fail("rate");
   }
 
@@ -58,26 +64,31 @@ export async function POST(req: NextRequest) {
 
   const session = await prisma.quoteSession.findUnique({
     where: { id: sessionId },
-    select: { id: true, blobUrl: true, fileMimeType: true },
+    select: { id: true, ocrMarkdown: true },
   });
   if (!session) return fail("not_found");
-  if (!session.blobUrl) return fail("no_file");
+  if (!session.ocrMarkdown) return fail("no_ocr");
 
   let extracted: ExtractedBill;
   try {
-    // Read the bytes back from the private store, then OCR them as base64.
-    const file = await get(session.blobUrl, { access: "private" });
-    if (!file) return fail("no_file");
-    const buffer = Buffer.from(await new Response(file.stream).arrayBuffer());
-    const markdown = await ocrBill(buffer.toString("base64"), session.fileMimeType);
-    extracted = await extractFields(markdown);
+    extracted = await extractFields(session.ocrMarkdown);
   } catch (err) {
     if (err instanceof ExtractionError) {
       console.error(`Extraction failed at ${err.stage}:`, err.message);
-      return fail(err.stage === "ocr" ? "ocr_failed" : "extraction_failed");
+      return fail("extraction_failed");
     }
     console.error("Extraction failed", err);
     return fail("server");
+  }
+
+  // Relevance gate: the model classified the document. If it isn't a bill, we
+  // don't persist garbage figures — we send the funnel to manual entry.
+  if (!extracted.isElectricityBill) {
+    const reason = extracted.rejectionReason?.trim();
+    const message = reason
+      ? `${reason} Check you uploaded the right file, or enter your numbers yourself.`
+      : ERROR_MESSAGES.not_a_bill;
+    return fail("not_a_bill", message);
   }
 
   try {

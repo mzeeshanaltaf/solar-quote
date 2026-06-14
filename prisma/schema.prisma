@@ -46,6 +46,7 @@ model QuoteSession {
   addressCountry       String? // country
   utilityName          String?
   extractionConfidence Json? // per-field confidence scores
+  ocrMarkdown          String? // raw Mistral OCR output, persisted so extraction can re-run without re-OCR
 
   // Location (Google Geocoding + user-confirmed pin)
   lat              Float?
