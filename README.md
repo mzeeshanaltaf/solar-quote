@@ -63,12 +63,22 @@ rate-limit), and mobile camera capture. The funnel never dead-ends. See
 [docs/PHASE-2.md](docs/PHASE-2.md) and the manual test matrix in
 [docs/test-corpus.md](docs/test-corpus.md).
 
+### Vision extraction (experimental)
+
+An alternative to stages 2–3 above: **`POST /api/extract-vision`** sends the bill image/PDF
+straight to `gpt-5.4-mini` in a **single call** (no Mistral OCR), reusing the same schema,
+prompt, and relevance gate. Toggle it with the build-time flag
+`NEXT_PUBLIC_EXTRACTION_MODE=vision` (anything else keeps the `upload → ocr → extract`
+pipeline). In vision mode the funnel skips `/api/ocr` and `MISTRAL_API_KEY` is not needed.
+This is an A/B experiment; if it wins on accuracy/latency/cost the OCR path will be retired.
+
 ## Environment variables
 
 See [.env.example](.env.example). Phase 1 needs only `DATABASE_URL`. **Phase 2.1 also
 requires** `BLOB_READ_WRITE_TOKEN`, `MISTRAL_API_KEY`, and `OPENAI_API_KEY` (optionally
-`OPENAI_EXTRACTION_MODEL` to override the default model, and the `UPSTASH_*` keys for
-rate limiting). Later phases add Google Maps and Better Auth keys.
+`OPENAI_EXTRACTION_MODEL` to override the default model, `NEXT_PUBLIC_EXTRACTION_MODE=vision`
+to use the single-call vision path, and the `UPSTASH_*` keys for rate limiting). Later
+phases add Google Maps and Better Auth keys.
 
 ## Design system
 

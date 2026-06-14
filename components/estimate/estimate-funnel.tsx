@@ -51,6 +51,12 @@ type Step =
 
 type ApiResponse<T> = T & { success?: boolean; error?: string; message?: string };
 
+// Experiment flag (build-time inlined). "vision" routes the funnel through the
+// single-call /api/extract-vision path (gpt-5.4-mini reads the file directly);
+// anything else keeps the proven upload → ocr → extract pipeline.
+const EXTRACTION_MODE =
+  process.env.NEXT_PUBLIC_EXTRACTION_MODE === "vision" ? "vision" : "ocr";
+
 // Copy for the dedicated failure screen, keyed by the typed error code the
 // extract route returns. Every path still offers manual entry, so the funnel
 // never dead-ends.
@@ -153,6 +159,24 @@ export function EstimateFunnel() {
     return true;
   };
 
+  // Vision path: one call reads the stored file directly (no OCR step).
+  const runVision = async (id: string): Promise<boolean> => {
+    setPhase("extracting");
+    const res = await fetch("/api/extract-vision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: id }),
+    });
+    const data = (await res.json()) as ApiResponse<{ extracted?: ExtractedBill }>;
+    if (!data.success || !data.extracted) {
+      goFailed(data);
+      return false;
+    }
+    setBill(data.extracted);
+    setStep("review");
+    return true;
+  };
+
   // The user confirms the preview: upload → OCR → extract, three real steps.
   const handleProcess = async () => {
     if (!file) return;
@@ -175,9 +199,13 @@ export function EstimateFunnel() {
       }
       setSessionId(upData.sessionId);
 
-      // 2. OCR, then 3. extraction.
-      if (!(await runOcr(upData.sessionId))) return;
-      await runExtract(upData.sessionId);
+      // 2. Extract. Vision does it in one call; OCR mode reads then extracts.
+      if (EXTRACTION_MODE === "vision") {
+        await runVision(upData.sessionId);
+      } else {
+        if (!(await runOcr(upData.sessionId))) return;
+        await runExtract(upData.sessionId);
+      }
     } catch {
       setError("Something went wrong. Check your connection and try again.");
       setStep("preview");
@@ -197,8 +225,12 @@ export function EstimateFunnel() {
     setErrorCode(null);
     setStep("extracting");
     try {
-      if (redoOcr && !(await runOcr(sessionId))) return;
-      await runExtract(sessionId);
+      if (EXTRACTION_MODE === "vision") {
+        await runVision(sessionId);
+      } else {
+        if (redoOcr && !(await runOcr(sessionId))) return;
+        await runExtract(sessionId);
+      }
     } catch {
       setErrorCode("server");
       setStep("failed");

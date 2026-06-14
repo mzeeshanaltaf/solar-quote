@@ -126,3 +126,57 @@ export async function extractFields(markdown: string): Promise<ExtractedBill> {
     );
   }
 }
+
+/**
+ * Single-call alternative to ocrBill + extractFields: send the raw bill image or
+ * PDF straight to the vision model and get the same typed fields back. Drops the
+ * separate OCR hop. Same schema, prompt, and model as extractFields — only the
+ * input changes (the document itself instead of OCR'd markdown).
+ */
+export async function extractFromFile(
+  base64: string,
+  mimeType: string | null | undefined
+): Promise<ExtractedBill> {
+  // Images go in as image parts; everything else (PDF) as a file part. OpenAI
+  // supports both for its vision models.
+  const filePart = isImageMime(mimeType)
+    ? ({ type: "image" as const, image: base64 })
+    : ({
+        type: "file" as const,
+        mediaType: mimeType ?? "application/pdf",
+        data: base64,
+      });
+
+  try {
+    const { object } = await generateObject({
+      model: openai(EXTRACTION_MODEL),
+      schema: ExtractedBillSchema,
+      schemaName: "ElectricityBill",
+      schemaDescription: "Structured fields extracted from an electricity bill.",
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "This is a customer's electricity bill. Read it directly and extract the fields.",
+            },
+            filePart,
+          ],
+        },
+      ],
+      providerOptions: {
+        openai: {
+          reasoningEffort: "medium",
+        },
+      },
+    });
+    return object;
+  } catch (err) {
+    throw new ExtractionError(
+      `Vision extraction failed: ${(err as Error).message}`,
+      "llm"
+    );
+  }
+}
