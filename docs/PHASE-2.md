@@ -1,151 +1,156 @@
-# SolarQuote Phase 2 — Bill Upload + Extraction (split into 2.1 and 2.2)
+# SolarQuote Phase 2 — Bill Upload + Extraction
+
+> **Status (2026-06-14): Phase 2.1 ✅ shipped · Phase 2.2 ✅ shipped.**
+> Both phases are implemented, built, and committed. The funnel runs end-to-end
+> against live Mistral OCR + OpenAI + Neon. One open item: the real-bill test
+> corpus is **documented but not yet run** against real bills — see
+> [test-corpus.md](test-corpus.md). The pipeline was also **re-architected from
+> two routes to three** during 2.2 (see "Architecture change" below).
 
 ## Context
 
-Phase 1 (scaffold, marketing site, design system, Prisma schema) is complete. The
-`/estimate` route is a stub ([app/estimate/page.tsx](../app/estimate/page.tsx)) carrying a
-`// Phase 2 replaces this stub...` marker. The `QuoteSession` model already has every
-field this phase writes to (`blobUrl`, `fileMimeType`, `kWhUsed`, `billAmount`,
-`currency`, `billingPeriodDays`, `rawAddress`, `utilityName`, `extractionConfidence`),
-and `lib/ratelimit.ts` already anticipates "the upload/extract routes in Phase 2."
+Phase 1 (scaffold, marketing site, design system, Prisma schema) is complete.
+`/estimate` is now the live funnel (no longer a stub). The `QuoteSession` model
+holds every field this phase writes (`blobUrl`, `fileMimeType`, `kWhUsed`,
+`billAmount`, `currency`, `billingPeriodDays`, `rawAddress`, coarse address
+components, `utilityName`, `extractionConfidence`) plus `ocrMarkdown` added in
+2.2.
 
-The original [PLAN.md](PLAN.md) Phase 2 has four parts (upload route, extract route,
-upload+review UI, real-bill testing). We are splitting it so the **core happy path ships
-first**:
-
-- **Phase 2.1 (this plan):** Upload a bill (PDF/JPG/PNG) → Mistral OCR to markdown →
-  `gpt-5-mini` structured extraction (kWh, amount, currency, billing period, address,
-  utility) → an editable review card where the user verifies/corrects the numbers. File
-  persisted to Vercel Blob, fields persisted to a `QuoteSession` row (Neon).
-- **Phase 2.2 (deferred):** manual-entry fallback, low-confidence highlighting, hardened
-  error/retry states, the multi-bill real-world test corpus, and mobile camera polish.
-
-**Confirmed decisions:** full Blob + DB persistence now; extraction via AI SDK
-`generateObject` with `@ai-sdk/openai` (`gpt-5-mini`); Mistral OCR called via raw `fetch`
-(no SDK, per the `/mistral-ocr` skill). Outcome: a homeowner can upload a bill and see
-their own consumption/cost read back to them, editable, persisted — the front half of the
-funnel working end to end.
+**Confirmed decisions (all implemented):** full Blob + DB persistence; extraction
+via AI SDK `generateObject` with `@ai-sdk/openai`; Mistral OCR via raw `fetch`.
+The Vercel Blob store is **private** (bills are PII) — `put` uses
+`access:"private"` and the server reads the bytes back to base64 for OCR, so no
+bill URL is ever public. Extraction model is **`gpt-5.4-mini`** (overridable via
+`OPENAI_EXTRACTION_MODEL`).
 
 ---
 
-## Prerequisites (do first)
+## Architecture change (2.2): two routes → three
 
-1. **Provision Neon** and set the **pooled** `DATABASE_URL` (host contains `-pooler`) in
-   `.env`. The current value is a placeholder; DB writes fail until this is real. Then
-   `npx prisma migrate deploy` (the Phase 1 migration is already committed; no schema
-   change is needed for 2.1 — every field exists).
-2. **Confirm env vars** already present in `.env`: `BLOB_READ_WRITE_TOKEN`,
-   `MISTRAL_API_KEY`, `OPENAI_API_KEY`, `UPSTASH_REDIS_REST_URL/TOKEN`. No `.env.example`
-   change needed (all already listed).
-3. **Install dependencies:**
-   - `@vercel/blob` — server upload to Blob.
-   - `ai` and `@ai-sdk/openai` — `generateObject` structured extraction.
-   - `react-dropzone` — drag/drop + camera-capture dropzone (optional; a plain
-     `<input type="file" accept>` works too, decide at build time).
-   - Verify the `gpt-5-mini` model ID is live before wiring it (per the `/ai-sdk` skill,
-     never trust a model ID from memory). If unavailable, fall back to `gpt-4o-mini`
-     behind the same `generateObject` call — only the model string changes.
+The original 2.1 plan had **`/api/upload`** then a single **`/api/extract`** that
+did OCR **and** the LLM in one request. During 2.2 this was split into **three
+sequentially-awaited routes** so the progress dialog reflects real work and
+retries are cheap:
+
+```
+POST /api/upload  → store file in private Blob, create QuoteSession (status UPLOADED)
+POST /api/ocr     → Mistral OCR → persist markdown to QuoteSession.ocrMarkdown
+POST /api/extract → LLM over the stored markdown → classify + persist fields (EXTRACTED)
+```
+
+Why: (1) the dialog can show a genuine **uploading → reading → extracting** phase
+per real request instead of timer-guessing; (2) a figure-parse failure re-runs
+**only the LLM** (the OCR markdown is already persisted), so "Try again" doesn't
+pay for OCR twice; (3) cleaner error attribution (OCR failures vs. LLM failures
+come from different routes).
+
+This required a schema change: **`QuoteSession.ocrMarkdown String?`** (migration
+`0004_ocr_markdown`, applied to Neon).
 
 ---
 
-## Phase 2.1 — Implementation
+## Phase 2.1 — Core happy path ✅
 
 ### Data / lib layer
 
-- **`lib/ratelimit.ts`** — add an `extractRatelimit` limiter next to `contactRatelimit`,
-  same null/fail-open pattern (e.g. `Ratelimit.slidingWindow(5, "10 m")`,
-  `prefix: "ratelimit:extract"`). Anonymous uploads hit two paid APIs, so this gates the
-  expensive route. Reuse the existing `getClientIp(headers)`.
-- **`lib/extraction.ts`** (new) — the pipeline, kept server-only:
-  - `ocrBill(fileUrl | base64, mimeType): Promise<string>` — POST to
-    `https://api.mistral.ai/v1/ocr`, model `mistral-ocr-latest`, body
-    `{ document: { type: "document_url" | "image_url", ... } }`. Pass the Blob URL as the
-    document URL (no base64 needed once the file is in Blob). Join `pages[].markdown`.
-  - `extractFields(markdown): Promise<ExtractedBill>` — `generateObject` with
-    `@ai-sdk/openai` `openai("gpt-5-mini")` and the Zod schema below; a system prompt
-    instructing it to read consumption + cost + address from an arbitrary global bill,
-    return ISO-4217 currency, and emit `null` for anything not present (never guess).
-  - **`ExtractedBillSchema` (Zod)** — single source of truth, shared by the route and the
-    client review form: `kWhUsed`, `billAmount` (both `number().nullable()`),
-    `currency` (ISO-4217 string, nullable), `billingPeriodDays` (int, nullable),
-    `rawAddress`, `utilityName` (string, nullable), plus a `confidence` object with a
-    `low | medium | high` per field (stored in `extractionConfidence` Json; the UI uses it
-    in 2.2 for highlighting).
+- **`lib/bill-schema.ts`** — `ExtractedBillSchema` (Zod), the single source of
+  truth shared by the server pipeline, the routes, and the client review form:
+  `kWhUsed`, `billAmount`, `currency`, `billingPeriodDays`, `rawAddress`, coarse
+  `addressTown/City/State/Country`, `utilityName`, plus a per-field `confidence`
+  object (`low|medium|high`). 2.2 added `isElectricityBill` + `rejectionReason`.
+- **`lib/extraction.ts`** (server-only) — `ocrBill(base64, mime)` POSTs to
+  `mistral-ocr-latest` and joins `pages[].markdown`; `extractFields(markdown)`
+  runs `generateObject` with `openai("gpt-5.4-mini")` and a global-bill system
+  prompt (extract only what's printed, ISO-4217 currency, `null` over guessing).
+- **`lib/ratelimit.ts`** — `extractRatelimit` (5/10m) gates the entry point;
+  same null/fail-open pattern as `contactRatelimit`.
 
-### API routes (mirror [app/api/contact/route.ts](../app/api/contact/route.ts) conventions)
+### API routes
 
-- **`app/api/upload/route.ts`** — `POST` multipart `FormData`:
-  1. `extractRatelimit` null-check → fail open; on hit return `429`.
-  2. Validate file: MIME allowlist (`application/pdf`, `image/jpeg`, `image/png`,
-     `image/webp`) and **10 MB cap** — reject with the same code/status-map shape
-     (`ERROR_STATUS` / `ERROR_MESSAGES`) the contact route uses.
-  3. `put(...)` to Vercel Blob (`access: "public"`), then `prisma.quoteSession.create`
-     with `blobUrl`, `fileMimeType`, `status: UPLOADED`.
-  4. Return `{ sessionId, blobUrl }` JSON.
-- **`app/api/extract/route.ts`** — `POST { sessionId }`:
-  1. Load the session, run `ocrBill(blobUrl)` → `extractFields(markdown)`.
-  2. `prisma.quoteSession.update`: write the extracted fields + `extractionConfidence`,
-     set `status: EXTRACTED`.
-  3. Return the parsed `ExtractedBill` JSON. On OCR/LLM failure return a typed error
-     (`extraction_failed`) so the client can surface manual entry (full fallback lands in
-     2.2) — **never throw a bare 500 that dead-ends the funnel.**
-  - Both routes import the shared `prisma` singleton from
-    [lib/prisma.ts](../lib/prisma.ts) and validate input with Zod.
+- **`/api/upload`** ✅ — multipart `FormData`; MIME allowlist + 10 MB cap; `put`
+  to private Blob; `quoteSession.create` (status `UPLOADED`); returns
+  `{ sessionId, blobUrl }`. Uses the shared `ERROR_STATUS`/`ERROR_MESSAGES` shape.
+- **`/api/extract`** ✅ (reworked in 2.2 — see above) — `POST { sessionId }` runs
+  the LLM over the persisted markdown and writes fields (status `EXTRACTED`);
+  `PATCH { sessionId, ...fields }` saves the user's verified/corrected values.
 
 ### Funnel UI — `/estimate`
 
-Replace the stub. Per CLAUDE.md hydration rule, the funnel is a client tree imported via
-`next/dynamic` `{ ssr: false }` (it initializes browser-only state):
-
-- **[app/estimate/page.tsx](../app/estimate/page.tsx)** — thin Server Component that
-  dynamically imports the client funnel with `{ ssr: false }`.
-- **`components/estimate/estimate-funnel.tsx`** (`"use client"`) — owns step state
-  (`upload | extracting | review`) and the `sessionId` / `ExtractedBill` in `useState`.
-- **`components/estimate/bill-dropzone.tsx`** — drag/drop + mobile camera
-  (`<input type="file" accept="image/*,application/pdf" capture="environment">`),
-  client-side size/type pre-check, then `POST /api/upload` → `POST /api/extract`.
-- **Progress UX** — use the `/shimmering-progress-dialog` skill for the 10–30 s
-  OCR+extraction wait (rotating warm-toned status lines). A basic dialog is enough for
-  2.1; richer messaging in 2.2.
-- **`components/estimate/review-card.tsx`** — editable card ("We read your bill — check
-  these numbers"). Build with the existing **`Field` / `FieldGroup` / `FieldLabel`**
-  system ([components/ui/field.tsx](../components/ui/field.tsx)) plus `Input`, `Button`,
-  `Badge`, `Alert`, `Spinner` — same primitives as
-  [components/contact-form.tsx](../components/contact-form.tsx). Fields: kWh used, bill
-  amount, currency, billing period (days), address, utility. A "Looks good" action
-  `PATCH`es any user edits back to the session (a small `/api/extract` PATCH or a dedicated
-  `/api/session` route) and is the seam where Phase 3 (location) picks up.
-
-Use design tokens from [app/globals.css](../app/globals.css) (`font-display` Young Serif
-headlines, amber `primary`, warm neutrals) and `cn()` from
-[lib/utils.ts](../lib/utils.ts). Lean on `/impeccable` + `/frontend-design` for the
-dropzone and review card so they match the marketing page's hand-crafted feel.
+- **`app/estimate/page.tsx`** — thin Server Component dynamically importing the
+  client funnel with `{ ssr:false }` (hydration rule).
+- **`components/estimate/estimate-funnel.tsx`** — owns step state and the
+  `sessionId` / `ExtractedBill`.
+- **`components/estimate/bill-dropzone.tsx`** — drag/drop + file picker (+ camera
+  in 2.2), client-side size/type pre-check.
+- **`components/estimate/bill-preview.tsx`** — react-pdf / image preview before
+  processing.
+- **`components/estimate/extraction-dialog.tsx`** — shimmering progress dialog
+  (phase-driven in 2.2).
+- **`components/estimate/review-card.tsx`** — editable card built on
+  `Field`/`FieldGroup`/`FieldLabel`; "Looks good" `PATCH`es edits back.
 
 ---
 
-## Phase 2.2 — Deferred (next iteration)
+## Phase 2.2 — Resilience layer ✅
 
-- **Manual-entry fallback** — short form (monthly kWh or bill amount + country) feeding the
-  same `QuoteSession`, shown when extraction fails or the user has no bill. Never dead-end.
-- **Low-confidence highlighting** — use the stored `extractionConfidence` to flag fields
-  the model was unsure about in the review card.
-- **Hardened error/retry states** — explicit OCR-fail / LLM-fail / rate-limited UI, retry,
-  and graceful Blob/DB failure handling; richer shimmer status copy.
-- **Real-bill test corpus** — US utility PDF, Pakistani DISCO photo, EU bill; verify
-  currency + kWh land correctly across schemas/languages (PLAN.md Phase 2 step 4).
-- **Mobile/camera polish** — upload-by-camera is the dominant global path; full responsive
-  pass.
+All five deferred items shipped:
+
+- **Manual-entry fallback** ✅ — `components/estimate/manual-entry-form.tsx` +
+  new **`/api/session`** route (`POST` creates a `QuoteSession` from typed numbers,
+  or updates an existing one when extraction failed; requires kWh **or** bill
+  amount; status `EXTRACTED`). Reachable from the upload step ("Enter your numbers
+  instead") and from every failure screen. Gated by a new **`sessionRatelimit`**
+  (20/10m) kept separate from `extractRatelimit` so a user whose extraction just
+  failed isn't blocked from the manual path.
+- **Low-confidence highlighting** ✅ — `review-card.tsx` flags fields whose stored
+  `extractionConfidence` is `low` with a warm amber border/background and a summary
+  banner counting the flagged fields.
+- **Hardened error/retry states** ✅ — the funnel has dedicated `failed` and
+  `manual` steps and surfaces the routes' **typed error codes** via a
+  `FAILURE_COPY` map: `rate`, `ocr_failed`, `not_a_bill`, `extraction_failed`,
+  `server`. "Try again" re-runs from the right point (OCR failures redo OCR +
+  LLM; figure failures reuse the persisted markdown and redo only the LLM).
+- **Relevance gate** ✅ (new in 2.2, beyond the original plan) — the extraction
+  schema gained `isElectricityBill` + `rejectionReason`, filled in the **same**
+  `generateObject` call (no extra LLM cost). A non-bill document returns a typed
+  `not_a_bill` (422) and the funnel routes to manual entry — no garbage figures
+  persisted.
+- **Mobile/camera polish** ✅ — the dropzone has a dedicated "Take a photo"
+  capture input (separate from the file picker, so phones aren't forced into the
+  camera); buttons stack on mobile; the review/manual cards are responsive.
+- **Phase-driven progress dialog** ✅ — `extraction-dialog.tsx` takes a
+  `phase: "uploading" | "ocr" | "extracting"` prop with three real progress dots;
+  copy rotates within each genuine phase.
+
+### Still open
+
+- **Real-bill test corpus** ⏳ — the test matrix (US / PK / EU / UK / IN / AU
+  bills + negative checks) is written up in [test-corpus.md](test-corpus.md) but
+  has **not yet been run against real bills**. Can't be automated without a stash
+  of real (PII-bearing) statements. Known edge case to watch: **net-metered /
+  solar-export bills** (e.g. LESCO with separate import/export meters) where
+  `kWhUsed` is ambiguous between gross import and net — exactly what the review
+  card's low-confidence highlighting is there to catch.
 
 ---
+
+## Deployment / migrations
+
+- **`vercel-build`** script runs `prisma generate && prisma migrate deploy &&
+  next build`, so production migrations apply automatically on every Vercel deploy.
+  (Local `npm run build` stays `prisma generate && next build` — DB-free.)
+- Production needs these env vars set in Vercel: `DATABASE_URL` (pooled Neon),
+  `BLOB_READ_WRITE_TOKEN`, `MISTRAL_API_KEY`, `OPENAI_API_KEY`, and the
+  `UPSTASH_*` pair. A bad/stale `DATABASE_URL` surfaces as a Prisma `P1000`
+  `AuthenticationFailed` on the upload step.
 
 ## Verification
 
-- `npm run build` clean; `npx prisma validate` clean (no schema change expected).
-- `npm run dev`, open `/estimate`: upload a sample bill (one PDF + one phone photo),
-  confirm the shimmer dialog shows during extraction, and the review card renders kWh,
-  amount, currency, and address read from the bill.
-- Edit a field, confirm "Looks good" persists: check the `QuoteSession` row in Neon (or
-  `npx prisma studio`) shows `status = EXTRACTED` with the edited values.
-- Negative checks: oversized file (>10 MB) and a disallowed type are both rejected with a
-  friendly message, not a crash; a forced OCR failure returns the typed error without
-  dead-ending.
+- `npm run build` clean; `npm run lint` clean; `npx prisma validate` clean.
+- `/estimate`: upload a PDF and a phone photo → confirm the dialog shows
+  uploading → reading → extracting, and the review card renders kWh, amount,
+  currency, and address; edit a field and confirm "Looks good" persists
+  (`status = EXTRACTED` in Neon).
+- Negative checks: oversized/disallowed file rejected gracefully; a non-bill
+  document hits the `not_a_bill` screen with manual entry; a forced OCR failure
+  offers retry + manual entry without dead-ending.

@@ -31,6 +31,10 @@ For local work, create a Neon dev branch and point `DATABASE_URL` at it:
 npx neonctl@latest branches create --name dev
 ```
 
+On Vercel, migrations apply automatically: the `vercel-build` script runs
+`prisma migrate deploy` before building, so pending migrations reach the
+production database on every deploy (requires a valid `DATABASE_URL`).
+
 ### Run
 
 ```bash
