@@ -40,6 +40,23 @@ const BillPreview = dynamic(
   }
 );
 
+// The Google Maps JS bundle is heavy and browser-only — load it lazily, only
+// once the funnel reaches the location step (and never on the server).
+const LocationStep = dynamic(
+  () =>
+    import("@/components/estimate/location-step").then((m) => ({
+      default: m.LocationStep,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center rounded-2xl border border-border bg-muted/40 py-16">
+        <Loader2Icon className="size-6 animate-spin text-primary" />
+      </div>
+    ),
+  }
+);
+
 type Step =
   | "upload"
   | "preview"
@@ -47,7 +64,22 @@ type Step =
   | "failed"
   | "manual"
   | "review"
+  | "location"
   | "done";
+
+// Drives the eyebrow step indicator. The funnel is four user-facing steps;
+// several internal states map onto the same one (e.g. upload/preview/extracting
+// are all "your bill").
+const STEP_META: Record<Step, string> = {
+  upload: "Step 1 of 4 · Your bill",
+  preview: "Step 1 of 4 · Your bill",
+  extracting: "Step 1 of 4 · Your bill",
+  failed: "Step 1 of 4 · Your bill",
+  manual: "Step 2 of 4 · Your bill",
+  review: "Step 2 of 4 · Your bill",
+  location: "Step 3 of 4 · Your roof",
+  done: "Step 3 of 4 · Your roof",
+};
 
 type ApiResponse<T> = T & { success?: boolean; error?: string; message?: string };
 
@@ -241,8 +273,10 @@ export function EstimateFunnel() {
     switch (step) {
       case "review":
         return "Here’s what we found.";
+      case "location":
+        return "Find your roof.";
       case "done":
-        return "Saved. Next stop: your roof.";
+        return "Saved. Sizing your system next.";
       case "failed":
         return "Let’s try another way.";
       case "manual":
@@ -261,7 +295,7 @@ export function EstimateFunnel() {
 
       <div className="flex flex-col gap-3">
         <p className="text-sm font-semibold tracking-[0.18em] text-primary uppercase">
-          Step 1 of 4 · Your bill
+          {STEP_META[step]}
         </p>
         <h1 className="text-4xl sm:text-5xl">{heading()}</h1>
         {step === "upload" && (
@@ -384,7 +418,7 @@ export function EstimateFunnel() {
           reason={file ? "failed" : "no-bill"}
           onDone={(id) => {
             setSessionId(id);
-            setStep("done");
+            setStep("location");
           }}
           onBack={() => {
             // Back to wherever they came from: the failure screen if we have an
@@ -398,6 +432,14 @@ export function EstimateFunnel() {
         <ReviewCard
           sessionId={sessionId}
           bill={bill}
+          onConfirmed={() => setStep("location")}
+          onReset={reset}
+        />
+      )}
+
+      {step === "location" && sessionId && (
+        <LocationStep
+          sessionId={sessionId}
           onConfirmed={() => setStep("done")}
           onReset={reset}
         />
@@ -407,10 +449,10 @@ export function EstimateFunnel() {
         <div className="flex flex-col items-start gap-6">
           <Alert>
             <CheckCircle2Icon />
-            <AlertTitle>Your bill is in</AlertTitle>
+            <AlertTitle>Roof located</AlertTitle>
             <AlertDescription>
-              We’ve saved your numbers. The next steps — pinning your roof and sizing your
-              system — are landing soon.
+              We’ve saved your numbers and pinned your roof. The next step — sizing your
+              system and crunching the savings — is landing soon.
             </AlertDescription>
           </Alert>
           <Button asChild variant="outline">

@@ -72,13 +72,34 @@ prompt, and relevance gate. Toggle it with the build-time flag
 pipeline). In vision mode the funnel skips `/api/ocr` and `MISTRAL_API_KEY` is not needed.
 This is an A/B experiment; if it wins on accuracy/latency/cost the OCR path will be retired.
 
+## Location + irradiance (Phase 3.1)
+
+After the review step, the funnel adds a **location step** so the estimate is sized for the
+right roof:
+
+1. **`POST /api/geocode`** — geocodes the bill's address with **Google Geocoding**
+   server-side (the unrestricted key never reaches the browser) and returns candidate pins
+   with a confidence derived from Google's `location_type`. The query is assembled from the
+   full printed address plus the coarse town/city/state/country components.
+2. **Map step** — a Google **satellite** view (`@vis.gl/react-google-maps`, lazy-loaded) with
+   a **draggable pin** the homeowner nudges onto their actual roof, plus an address search box
+   for when geocoding misses. It never dead-ends.
+3. **`PATCH /api/geocode`** — persists the confirmed `lat`/`lng`/`formattedAddress` and moves
+   the session to status `LOCATED`.
+
+Irradiance (`/api/irradiance`, PVGIS → NASA POWER) lands in Phase 3.2. See
+[docs/PHASE-3.md](docs/PHASE-3.md).
+
 ## Environment variables
 
 See [.env.example](.env.example). Phase 1 needs only `DATABASE_URL`. **Phase 2.1 also
 requires** `BLOB_READ_WRITE_TOKEN`, `MISTRAL_API_KEY`, and `OPENAI_API_KEY` (optionally
 `OPENAI_EXTRACTION_MODEL` to override the default model, `NEXT_PUBLIC_EXTRACTION_MODE=vision`
-to use the single-call vision path, and the `UPSTASH_*` keys for rate limiting). Later
-phases add Google Maps and Better Auth keys.
+to use the single-call vision path, and the `UPSTASH_*` keys for rate limiting). **Phase 3.1
+adds** `GOOGLE_MAPS_API_KEY` (server, Geocoding API) and `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+(browser, Maps JS — HTTP-referrer restricted); optionally `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID`
+(a vector map ID for `AdvancedMarker`, falls back to `DEMO_MAP_ID`). Later phases add Better
+Auth keys.
 
 ## Design system
 

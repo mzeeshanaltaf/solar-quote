@@ -6,7 +6,7 @@ A homeowner uploads an electricity bill (PDF/photo). The system extracts consump
 
 **Decisions made:**
 - **Market:** Global from day one — no fixed bill schema; extraction is fully AI-driven; currency comes from the bill itself.
-- **Pipeline:** Mistral OCR (`mistral-ocr-latest`, handles PDF + images, multilingual) → markdown → **OpenAI GPT-5.x** (e.g. `gpt-5-mini`) with structured outputs → typed JSON fields.
+- **Pipeline:** Mistral OCR (`mistral-ocr-latest`, handles PDF + images, multilingual) → markdown → **OpenAI GPT-5.x** (`gpt-5.4-mini`) with structured outputs → typed JSON fields. (An experimental single-call vision path sends the file straight to `gpt-5.4-mini`, skipping OCR — see Phase 2.)
 - **Stack:** Next.js (App Router) full-stack on Vercel, Tailwind v4, shadcn/ui, Prisma + **Neon Postgres**, **Vercel Blob** for bill files.
 - **Maps:** Google Maps — Geocoding API (address → lat/lng) + Maps JS with satellite view for pin confirmation.
 - **Auth:** Homeowner flow fully anonymous; admin dashboard behind **Better Auth** (email/password, seeded admin).
@@ -48,8 +48,11 @@ app/
     page.tsx                         # upload → review → location → results
   admin/                             # Phase 5, Better Auth protected
   api/
-    upload/route.ts                  # → Vercel Blob, creates QuoteSession
-    extract/route.ts                 # Mistral OCR → GPT-5.x structured output
+    upload/route.ts                  # → private Vercel Blob, creates QuoteSession
+    ocr/route.ts                     # Mistral OCR → persists markdown on session
+    extract/route.ts                 # GPT-5.x structured output over the markdown
+    extract-vision/route.ts          # experimental single-call vision extraction (no OCR)
+    session/route.ts                 # manual-entry fallback (typed numbers → QuoteSession)
     geocode/route.ts                 # Google Geocoding (server-side, key hidden)
     irradiance/route.ts              # PVGIS → NASA POWER fallback
     estimate/route.ts                # sizing + ROI calc, persists to session
@@ -84,13 +87,25 @@ docs/PLAN.md                         # this document
 3. Design system via `/impeccable` + `/frontend-design`: warm-editorial tokens (palette, serif display font e.g. Fraunces/Source Serif + humanist sans, spacing scale) in `globals.css` — defined once, used by every later phase.
 4. Landing page: hero ("Your bill already knows if solar is worth it"), 3-step how-it-works, trust/FAQ section, footer. Primary CTA routes to `/estimate` (stub until Phase 2). Mobile-first, semantic HTML, OG/meta tags. Keep it a Server Component except interactive islands (`/vercel-react-best-practices`).
 
-### Phase 2 — Bill Upload + Extraction Pipeline
+### Phase 2 — Bill Upload + Extraction Pipeline ✅ (as built)
 > **Skills:** `/mistral-ocr`, `/ai-sdk`, `/shimmering-progress-dialog`, `/shadcn`, `/vercel-react-best-practices`
+> Detailed build notes: [docs/PHASE-2.md](PHASE-2.md). Shipped in 2.1 (happy path) + 2.2 (resilience), then a vision-extraction experiment.
 
-1. `/api/upload`: validate type/size → Vercel Blob → create QuoteSession. Rate limiting from day one.
-2. `/api/extract`: OCR per `/mistral-ocr` (blob URL → markdown), then structured extraction per `/ai-sdk` — `generateObject` with the OpenAI provider (`gpt-5-mini`) and a Zod schema (kWh, bill amount, currency ISO code, billing period, address, utility, per-field confidence).
-3. `/estimate` step 1+2 UI: upload dropzone (camera-friendly on mobile), progress dialog per `/shimmering-progress-dialog` (extraction takes 10–30 s), editable review card (shadcn form components), manual-entry fallback. Whole funnel tree imported via `next/dynamic` `{ ssr: false }` (browser APIs in state init — hydration rule).
-4. Test with a corpus of real bills: US utility PDF, Pakistani DISCO photo, EU bill — verify currency + kWh land correctly.
+**Pipeline split into three sequentially-awaited routes** (the original plan's single `/api/extract` was split so the progress dialog reflects real work and retries are cheap):
+
+1. **`/api/upload`** — multipart `FormData`; MIME allowlist (pdf/jpg/png/webp) + 10 MB cap; `put` to a **private** Vercel Blob (`access:"private"` — bills are PII, never a public URL); creates `QuoteSession` (status `UPLOADED`). Gated by `extractRatelimit` (5/10m).
+2. **`/api/ocr`** — reads the bytes back from the private store to base64, OCRs with **Mistral** (`mistral-ocr-latest`) per `/mistral-ocr`, and **persists the markdown** to a new `QuoteSession.ocrMarkdown` column (migration `0004_ocr_markdown`) so retries don't pay for OCR twice.
+3. **`/api/extract`** — `generateObject` per `/ai-sdk` over the persisted markdown with the OpenAI provider (**`gpt-5.4-mini`**, overridable via `OPENAI_EXTRACTION_MODEL`; `reasoningEffort:"medium"`, `serviceTier:"flex"`) and the shared `ExtractedBillSchema` (kWh, bill amount, ISO currency, billing period, `rawAddress` + coarse `addressTown/City/State/Country`, utility, per-field confidence). **POST** extracts + persists (status `EXTRACTED`); **PATCH** saves the user's verified/corrected values. A failed figure-parse re-runs only this LLM step (OCR markdown is already stored).
+
+**Relevance gate** (beyond original plan): the schema also carries `isElectricityBill` + `rejectionReason`, filled in the *same* `generateObject` call (no extra cost). A non-bill returns a typed `not_a_bill` (422) and the funnel routes to manual entry — no garbage figures persisted.
+
+**Manual-entry fallback** is its own route **`/api/session`** (POST creates *or* updates a `QuoteSession` from typed numbers; requires kWh **or** bill amount; status `EXTRACTED`), gated by a separate generous `sessionRatelimit` (20/10m, shared with `/api/ocr` + `/api/extract`) so a user whose extraction just failed isn't blocked from the manual path.
+
+**Vision-extraction experiment** (`/api/extract-vision`): a single-call alternative that sends the bill image/PDF straight to `gpt-5.4-mini` (no Mistral OCR), reusing the same schema, prompt, and relevance gate. Gated by the build-time flag `NEXT_PUBLIC_EXTRACTION_MODE=vision`; the funnel branches between `upload→ocr→extract` and `upload→extract-vision`. A/B experiment — if it wins on accuracy/latency/cost, the OCR path will be retired.
+
+**`/estimate` UI** (client funnel, imported via `next/dynamic` `{ ssr:false }` — hydration rule): `estimate-funnel.tsx` owns step state; `bill-dropzone.tsx` (separate file picker + dedicated mobile "Take a photo" capture input); `bill-preview.tsx` (react-pdf / `<img>` preview); phase-driven `extraction-dialog.tsx` per `/shimmering-progress-dialog` (`uploading → ocr → extracting` dots); `review-card.tsx` (editable shadcn form, **low-confidence fields highlighted** amber with a summary banner); `manual-entry-form.tsx`. The funnel has dedicated `failed` + `manual` steps surfacing the routes' typed error codes via a `FAILURE_COPY` map (`rate`/`ocr_failed`/`not_a_bill`/`extraction_failed`/`server`) — it never dead-ends.
+
+**Still open:** the real-bill test corpus (US/PK/EU/UK/IN/AU + negative checks) is documented in [docs/test-corpus.md](test-corpus.md) but **not yet run against real bills** (needs PII-bearing statements). Known edge case to watch: net-metered/solar-export bills where `kWhUsed` is ambiguous between gross import and net.
 
 ### Phase 3 — Location + Irradiance
 > **Skills:** `/nextjs-best-practices`, `/neon-postgres`, `/vercel-react-best-practices`

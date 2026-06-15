@@ -22,9 +22,11 @@ type FormState = {
   billAmount: string;
   currency: string;
   billingPeriodDays: string;
-  addressCity: string;
-  addressCountry: string;
   rawAddress: string;
+  addressTown: string;
+  addressCity: string;
+  addressState: string;
+  addressCountry: string;
   utilityName: string;
 };
 
@@ -33,9 +35,11 @@ const EMPTY: FormState = {
   billAmount: "",
   currency: "",
   billingPeriodDays: "",
-  addressCity: "",
-  addressCountry: "",
   rawAddress: "",
+  addressTown: "",
+  addressCity: "",
+  addressState: "",
+  addressCountry: "",
   utilityName: "",
 };
 
@@ -56,9 +60,11 @@ export interface ManualValues {
   billAmount: number | null;
   currency: string | null;
   billingPeriodDays: number | null;
-  addressCity: string | null;
-  addressCountry: string | null;
   rawAddress: string | null;
+  addressTown: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressCountry: string | null;
   utilityName: string | null;
 }
 
@@ -95,9 +101,11 @@ export function ManualEntryForm({
       billAmount: numOrNull(form.billAmount),
       currency: strOrNull(form.currency)?.toUpperCase() ?? null,
       billingPeriodDays: numOrNull(form.billingPeriodDays),
-      addressCity: strOrNull(form.addressCity),
-      addressCountry: strOrNull(form.addressCountry),
       rawAddress: strOrNull(form.rawAddress),
+      addressTown: strOrNull(form.addressTown),
+      addressCity: strOrNull(form.addressCity),
+      addressState: strOrNull(form.addressState),
+      addressCountry: strOrNull(form.addressCountry),
       utilityName: strOrNull(form.utilityName),
     };
 
@@ -209,6 +217,33 @@ export function ManualEntryForm({
               />
             </Field>
 
+            <Field>
+              <FieldLabel htmlFor="man-address">
+                Full address <span className="text-muted-foreground">(optional)</span>
+              </FieldLabel>
+              <Textarea
+                id="man-address"
+                rows={2}
+                placeholder="House / street, area, city, country"
+                value={form.rawAddress}
+                onChange={set("rawAddress")}
+              />
+              <FieldDescription>
+                The more precise your address, the better we can pin your roof on the
+                map next.
+              </FieldDescription>
+            </Field>
+
+            <Field orientation="responsive">
+              <FieldLabel htmlFor="man-town">Town / area</FieldLabel>
+              <Input
+                id="man-town"
+                placeholder="e.g. Gulshan-e-Iqbal"
+                value={form.addressTown}
+                onChange={set("addressTown")}
+              />
+            </Field>
+
             <Field orientation="responsive">
               <FieldLabel htmlFor="man-city">City</FieldLabel>
               <Input
@@ -216,6 +251,16 @@ export function ManualEntryForm({
                 placeholder="e.g. Karachi"
                 value={form.addressCity}
                 onChange={set("addressCity")}
+              />
+            </Field>
+
+            <Field orientation="responsive">
+              <FieldLabel htmlFor="man-state">State / region</FieldLabel>
+              <Input
+                id="man-state"
+                placeholder="e.g. Sindh"
+                value={form.addressState}
+                onChange={set("addressState")}
               />
             </Field>
 
@@ -230,19 +275,13 @@ export function ManualEntryForm({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="man-address">
-                Full address <span className="text-muted-foreground">(optional)</span>
-              </FieldLabel>
-              <Textarea
-                id="man-address"
-                rows={2}
-                placeholder="House / street, area, city, country"
-                value={form.rawAddress}
-                onChange={set("rawAddress")}
+              <FieldLabel htmlFor="man-utility">Utility company</FieldLabel>
+              <Input
+                id="man-utility"
+                placeholder="Your electricity provider"
+                value={form.utilityName}
+                onChange={set("utilityName")}
               />
-              <FieldDescription>
-                The more precise your address, the better we can size your roof later.
-              </FieldDescription>
             </Field>
 
             {status === "error" && (
