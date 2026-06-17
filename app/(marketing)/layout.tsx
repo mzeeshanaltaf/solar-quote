@@ -66,6 +66,9 @@ export default function MarketingLayout({
               <Link href="/terms" className="hover:text-background">
                 Terms
               </Link>
+              <Link href="/admin" className="text-background/40 hover:text-background">
+                Admin
+              </Link>
             </nav>
           </div>
           <p className="max-w-[75ch] text-sm leading-relaxed text-background/60">

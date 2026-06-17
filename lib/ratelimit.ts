@@ -44,6 +44,18 @@ export const sessionRatelimit = redis
     })
   : null;
 
+// Lead capture writes one row and (optionally) pings a webhook — no paid
+// extraction APIs — so it's gated like the contact form rather than as hard as
+// uploads. Separate counter so a lead submit never shares a window with the
+// funnel's extract/session budgets.
+export const leadRatelimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(8, "10 m"),
+      prefix: "ratelimit:lead",
+    })
+  : null;
+
 export function getClientIp(headers: Headers): string {
   const forwarded = headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();

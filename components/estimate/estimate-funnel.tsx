@@ -5,7 +5,6 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import {
   ArrowLeftIcon,
-  CheckCircle2Icon,
   Loader2Icon,
   PencilLineIcon,
   RotateCcwIcon,
@@ -20,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BillDropzone } from "@/components/estimate/bill-dropzone";
 import { ReviewCard } from "@/components/estimate/review-card";
 import { ManualEntryForm } from "@/components/estimate/manual-entry-form";
+import { LeadFormSheet } from "@/components/estimate/lead-form-sheet";
 import {
   ExtractionDialog,
   type ExtractionPhase,
@@ -165,7 +165,7 @@ export function EstimateFunnel() {
   const [manualReturn, setManualReturn] = useState<"location" | "estimate">(
     "location"
   );
-  const [quotesRequested, setQuotesRequested] = useState(false);
+  const [leadOpen, setLeadOpen] = useState(false);
 
   const reset = () => {
     setStep("upload");
@@ -176,7 +176,7 @@ export function EstimateFunnel() {
     setBill(null);
     setEstimateData(null);
     setManualReturn("location");
-    setQuotesRequested(false);
+    setLeadOpen(false);
   };
 
   // Picking a file only stages it for preview — nothing is uploaded or read yet.
@@ -558,25 +558,20 @@ export function EstimateFunnel() {
         </div>
       )}
 
-      {step === "results" && estimateData && (
-        <div className="flex flex-col gap-6">
+      {step === "results" && estimateData && sessionId && (
+        <>
           <ResultsView
             params={estimateData.params}
             baseline={estimateData.estimate}
-            onRequestQuotes={() => setQuotesRequested(true)}
+            onRequestQuotes={() => setLeadOpen(true)}
             onReset={reset}
           />
-          {quotesRequested && (
-            <Alert>
-              <CheckCircle2Icon />
-              <AlertTitle>You’re on the list</AlertTitle>
-              <AlertDescription>
-                Connecting you with installers arrives in the next step — your bill
-                stays private until then.
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
+          <LeadFormSheet
+            sessionId={sessionId}
+            open={leadOpen}
+            onOpenChange={setLeadOpen}
+          />
+        </>
       )}
 
       {step === "estimate_failed" && (
