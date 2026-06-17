@@ -38,3 +38,5 @@ Warm-editorial "sunlight" direction — explicitly avoid the generic AI-SaaS loo
 ## Environment
 
 Phase 1 needs only `DATABASE_URL` (Neon **pooled** string — host contains `-pooler`). Later phases add Vercel Blob, Mistral OCR, OpenAI, Google Maps, Better Auth, Upstash, and n8n keys. See [.env.example](.env.example). Phase status is tracked in memory.
+
+**Deployment:** live at https://solar-quote-nu.vercel.app, deployed from `main` on push. **Vercel's `DATABASE_URL` points at the same Neon database as local `.env`** — so local dev (and `npm run seed:admin`) writes to the production DB; there is no separate prod database. Runtime admin-auth env vars on Vercel: `BETTER_AUTH_SECRET` + `BETTER_AUTH_URL`. `ADMIN_EMAIL`/`ADMIN_PASSWORD`/`ADMIN_NAME` are seed-only (read by `scripts/seed-admin.ts`), not needed in Vercel.

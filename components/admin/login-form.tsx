@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { AlertCircleIcon } from "lucide-react";
 
 import { signIn } from "@/lib/auth-client";
@@ -14,7 +13,6 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 type Status = "idle" | "loading" | "error";
 
 export function LoginForm() {
-  const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [email, setEmail] = useState("");
@@ -37,10 +35,11 @@ export function LoginForm() {
       return;
     }
 
-    // The session cookie is set; land on the dashboard. refresh() re-runs the
-    // server layout's session check with the new cookie.
-    router.replace("/admin");
-    router.refresh();
+    // Hard navigation (not router.replace) so the request to the guarded
+    // /admin route carries the just-set session cookie. A client-side
+    // navigation can fire before Next's router/proxy sees the brand-new cookie,
+    // which on a first login bounced to /admin/login until a manual refresh.
+    window.location.assign("/admin");
   };
 
   return (
