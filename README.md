@@ -72,7 +72,7 @@ prompt, and relevance gate. Toggle it with the build-time flag
 pipeline). In vision mode the funnel skips `/api/ocr` and `MISTRAL_API_KEY` is not needed.
 This is an A/B experiment; if it wins on accuracy/latency/cost the OCR path will be retired.
 
-## Location + irradiance (Phase 3.1)
+## Location + irradiance (Phase 3.1 + 3.2)
 
 After the review step, the funnel adds a **location step** so the estimate is sized for the
 right roof:
@@ -87,8 +87,15 @@ right roof:
 3. **`PATCH /api/geocode`** — persists the confirmed `lat`/`lng`/`formattedAddress` and moves
    the session to status `LOCATED`.
 
-Irradiance (`/api/irradiance`, PVGIS → NASA POWER) lands in Phase 3.2. See
-[docs/PHASE-3.md](docs/PHASE-3.md).
+Once the pin is confirmed, the funnel fires **`POST /api/irradiance`** (non-blocking, behind
+a brief "checking the sunlight" step) to resolve the roof's **specific yield** — the annual
+kWh produced per kWp installed (kWh/kWp/yr), the multiplier Phase 4's ROI math needs.
+**PVGIS** v5.3 (`PVcalc`) is the primary source; **NASA POWER** climatology is the global
+fallback when PVGIS errors or a point is out of coverage. Results are cached in an
+`IrradianceCache` table keyed by lat/lng rounded to 2 dp (~1.1 km), so nearby sessions reuse
+one upstream call. The value is persisted on the session (status stays `LOCATED`; Phase 4
+advances it to `ESTIMATED`). On failure the funnel still advances — Phase 4 handles the
+missing-yield fallback. See [docs/PHASE-3.md](docs/PHASE-3.md).
 
 ## Environment variables
 
