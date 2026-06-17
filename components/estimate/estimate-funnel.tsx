@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import type { ExtractedBill } from "@/lib/bill-schema";
+import type { EstimateParams, EstimateResult } from "@/lib/solar-math";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BillDropzone } from "@/components/estimate/bill-dropzone";
@@ -57,6 +58,25 @@ const LocationStep = dynamic(
   }
 );
 
+// The results view pulls in motion + the SVG chart — only needed on the final
+// screen, so load it lazily (and client-only) like the other heavy steps.
+const ResultsView = dynamic(
+  () =>
+    import("@/components/estimate/results-view").then((m) => ({
+      default: m.ResultsView,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center rounded-2xl border border-border bg-muted/40 py-16">
+        <Loader2Icon className="size-6 animate-spin text-primary" />
+      </div>
+    ),
+  }
+);
+
+type EstimateData = { params: EstimateParams; estimate: EstimateResult };
+
 type Step =
   | "upload"
   | "preview"
@@ -66,7 +86,9 @@ type Step =
   | "review"
   | "location"
   | "irradiance"
-  | "done";
+  | "estimating"
+  | "results"
+  | "estimate_failed";
 
 // Drives the eyebrow step indicator. The funnel is four user-facing steps;
 // several internal states map onto the same one (e.g. upload/preview/extracting
@@ -80,7 +102,9 @@ const STEP_META: Record<Step, string> = {
   review: "Step 2 of 4 · Your bill",
   location: "Step 3 of 4 · Your roof",
   irradiance: "Step 3 of 4 · Your roof",
-  done: "Step 3 of 4 · Your roof",
+  estimating: "Step 4 of 4 · Your savings",
+  results: "Step 4 of 4 · Your savings",
+  estimate_failed: "Step 4 of 4 · Your savings",
 };
 
 type ApiResponse<T> = T & { success?: boolean; error?: string; message?: string };
@@ -135,6 +159,13 @@ export function EstimateFunnel() {
   const [file, setFile] = useState<File | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [bill, setBill] = useState<ExtractedBill | null>(null);
+  const [estimateData, setEstimateData] = useState<EstimateData | null>(null);
+  // Where manual entry should return to: "location" early in the funnel, or
+  // straight back to "estimate" if the user came from a missing-figures estimate.
+  const [manualReturn, setManualReturn] = useState<"location" | "estimate">(
+    "location"
+  );
+  const [quotesRequested, setQuotesRequested] = useState(false);
 
   const reset = () => {
     setStep("upload");
@@ -143,6 +174,9 @@ export function EstimateFunnel() {
     setFile(null);
     setSessionId(null);
     setBill(null);
+    setEstimateData(null);
+    setManualReturn("location");
+    setQuotesRequested(false);
   };
 
   // Picking a file only stages it for preview — nothing is uploaded or read yet.
@@ -271,9 +305,39 @@ export function EstimateFunnel() {
     }
   };
 
-  // Pin confirmed: resolve the roof's solar irradiance, then land on done.
-  // Non-blocking by design — if the lookup fails we store nothing and still
-  // advance; Phase 4 handles the missing-yield fallback.
+  // Compute + persist the estimate, then show the results. On a missing-figures
+  // (insufficient) result, route to manual entry to fill the gap; on any other
+  // failure, surface a retryable error — the funnel never dead-ends.
+  const runEstimate = async (id: string) => {
+    setStep("estimating");
+    setError(null);
+    try {
+      const res = await fetch("/api/estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: id }),
+      });
+      const data = (await res.json()) as ApiResponse<EstimateData>;
+      if (data.success && data.params && data.estimate) {
+        setEstimateData({ params: data.params, estimate: data.estimate });
+        setStep("results");
+        return;
+      }
+      if (data.error === "insufficient") {
+        setManualReturn("estimate");
+        setStep("manual");
+        return;
+      }
+      setError(data.message ?? null);
+      setStep("estimate_failed");
+    } catch {
+      setError("Something went wrong. Check your connection and try again.");
+      setStep("estimate_failed");
+    }
+  };
+
+  // Pin confirmed: resolve the roof's solar irradiance (best-effort — Phase 4's
+  // math falls back to a regional yield if it's missing), then size the system.
   const handleLocated = async () => {
     setStep("irradiance");
     if (sessionId) {
@@ -284,10 +348,10 @@ export function EstimateFunnel() {
           body: JSON.stringify({ sessionId }),
         });
       } catch {
-        // Swallow — the funnel must reach the results regardless.
+        // Swallow — sizing falls back to a regional yield estimate.
       }
+      await runEstimate(sessionId);
     }
-    setStep("done");
   };
 
   const heading = () => {
@@ -298,8 +362,12 @@ export function EstimateFunnel() {
         return "Find your roof.";
       case "irradiance":
         return "Checking your sunlight.";
-      case "done":
-        return "Saved. Sizing your system next.";
+      case "estimating":
+        return "Crunching your numbers.";
+      case "results":
+        return "Here’s what your roof could do.";
+      case "estimate_failed":
+        return "Almost there.";
       case "failed":
         return "Let’s try another way.";
       case "manual":
@@ -441,12 +509,23 @@ export function EstimateFunnel() {
           reason={file ? "failed" : "no-bill"}
           onDone={(id) => {
             setSessionId(id);
-            setStep("location");
+            if (manualReturn === "estimate") {
+              // They came here to supply a missing figure — re-run sizing now,
+              // no need to re-confirm the roof.
+              setManualReturn("location");
+              void runEstimate(id);
+            } else {
+              setStep("location");
+            }
           }}
           onBack={() => {
-            // Back to wherever they came from: the failure screen if we have an
-            // uploaded session, otherwise the upload step.
-            setStep(file ? "failed" : "upload");
+            // Back to wherever they came from.
+            if (manualReturn === "estimate") {
+              setManualReturn("location");
+              setStep("estimate_failed");
+            } else {
+              setStep(file ? "failed" : "upload");
+            }
           }}
         />
       )}
@@ -468,24 +547,73 @@ export function EstimateFunnel() {
         />
       )}
 
-      {step === "irradiance" && (
+      {(step === "irradiance" || step === "estimating") && (
         <div className="flex items-center justify-center gap-2.5 rounded-2xl border border-border bg-muted/40 py-20 text-muted-foreground">
           <Loader2Icon className="size-5 animate-spin text-primary" />
-          <span className="text-sm">Checking the sunlight at your roof…</span>
+          <span className="text-sm">
+            {step === "irradiance"
+              ? "Checking the sunlight at your roof…"
+              : "Sizing your system and working out the savings…"}
+          </span>
         </div>
       )}
 
-      {step === "done" && (
-        <div className="flex flex-col items-start gap-6">
-          <Alert>
-            <CheckCircle2Icon />
-            <AlertTitle>Roof located</AlertTitle>
+      {step === "results" && estimateData && (
+        <div className="flex flex-col gap-6">
+          <ResultsView
+            params={estimateData.params}
+            baseline={estimateData.estimate}
+            onRequestQuotes={() => setQuotesRequested(true)}
+            onReset={reset}
+          />
+          {quotesRequested && (
+            <Alert>
+              <CheckCircle2Icon />
+              <AlertTitle>You’re on the list</AlertTitle>
+              <AlertDescription>
+                Connecting you with installers arrives in the next step — your bill
+                stays private until then.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
+
+      {step === "estimate_failed" && (
+        <div className="flex flex-col gap-6">
+          <Alert variant="destructive">
+            <TriangleAlertIcon />
+            <AlertTitle>We couldn’t finish your estimate</AlertTitle>
             <AlertDescription>
-              We’ve saved your numbers and pinned your roof. The next step — sizing your
-              system and crunching the savings — is landing soon.
+              {error ??
+                "Something went wrong working out your savings. Try again, or adjust your numbers."}
             </AlertDescription>
           </Alert>
-          <Button asChild variant="outline">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
+            <Button
+              type="button"
+              size="lg"
+              onClick={() => sessionId && runEstimate(sessionId)}
+              className="sm:flex-1"
+            >
+              <RotateCcwIcon data-icon="inline-start" />
+              Try again
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              onClick={() => {
+                setManualReturn("estimate");
+                setStep("manual");
+              }}
+              className="sm:flex-1"
+            >
+              <PencilLineIcon data-icon="inline-start" />
+              Check my numbers
+            </Button>
+          </div>
+          <Button asChild variant="ghost" className="self-start">
             <Link href="/">
               <ArrowLeftIcon data-icon="inline-start" />
               Back to the front page

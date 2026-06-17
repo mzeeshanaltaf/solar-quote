@@ -97,6 +97,27 @@ one upstream call. The value is persisted on the session (status stays `LOCATED`
 advances it to `ESTIMATED`). On failure the funnel still advances — Phase 4 handles the
 missing-yield fallback. See [docs/PHASE-3.md](docs/PHASE-3.md).
 
+## Sizing + savings/ROI results (Phase 4)
+
+The final funnel step turns the bill figures and specific yield into the money screen:
+
+1. **`POST /api/estimate`** — sizes the system and computes the savings/ROI, persists the
+   headline numbers + full breakdown to the session, and advances status to `ESTIMATED`.
+2. **Results screen** — a headline annual-savings number (count-up), a live **offset
+   slider** (80 / 100 / 120% of your usage) that re-sizes the system and recomputes
+   everything client-side, key stats (system size, payback, 25-year savings), a hand-built
+   SVG **25-year cumulative-savings chart** with a payback marker, an honest "how we worked
+   this out" breakdown, and a soft **"Get quotes from installers"** CTA (the lead form lands
+   in Phase 5).
+
+The ROI model is **currency-agnostic**: the effective tariff comes from the user's own bill
+(`amount ÷ kWh`), so savings land in the bill's currency with no tariff database. Installed
+cost uses per-kWp **USD** regional defaults converted via a static FX table — and degrades
+gracefully (cost/payback hidden) for currencies without an FX entry, or falls back to a
+regional specific yield when irradiance is unavailable. The math (`lib/solar-math.ts`) is
+pure and **unit-tested** with `vitest` (`npm test`); the estimate tables live in
+`lib/cost-defaults.ts`, every value labelled an estimate. See [docs/PHASE-4.md](docs/PHASE-4.md).
+
 ## Environment variables
 
 See [.env.example](.env.example). Phase 1 needs only `DATABASE_URL`. **Phase 2.1 also
