@@ -7,7 +7,7 @@ estimate — in the bill's own currency — then captures the visitor as a lead 
 operator. Built to work **globally from day one**: no fixed bill schema, no tariff
 database, currency comes from the bill itself.
 
-🔗 **Live demo:** https://solar-quote-nu.vercel.app
+🔗 **Live demo:** https://solarquote.zeeshanai.cloud/
 
 ## What it does
 
