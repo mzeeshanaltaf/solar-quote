@@ -1,8 +1,40 @@
 # SolarQuote
 
-Bill-to-solar-estimate lead generation platform. A homeowner uploads an electricity bill, the system extracts consumption and address, fetches solar irradiance for the location, sizes a system, and shows a savings/ROI estimate. Full plan: [docs/plan.md](docs/plan.md).
+**Bill-to-solar-estimate lead-generation funnel.** A homeowner uploads an electricity
+bill; SolarQuote reads the consumption and address straight off it (OCR + AI), fetches
+real solar irradiance for the roof, sizes a system, and shows a personalised savings/ROI
+estimate — in the bill's own currency — then captures the visitor as a lead for the
+operator. Built to work **globally from day one**: no fixed bill schema, no tariff
+database, currency comes from the bill itself.
 
-**Stack:** Next.js (App Router) · Tailwind v4 · shadcn/ui · Prisma + Neon Postgres · Vercel Blob.
+🔗 **Live demo:** https://solar-quote-nu.vercel.app
+
+## What it does
+
+- **Reads any electricity bill** — PDF or phone photo, any country/layout/language — via
+  Mistral OCR → GPT structured extraction, with a single-call vision path as an experiment.
+- **Sizes the system from real sunlight data** — PVGIS (with a global NASA POWER fallback)
+  gives the roof's specific yield; the user confirms the exact roof on a satellite map.
+- **Currency-agnostic ROI** — the tariff is derived from the user's own bill
+  (`amount ÷ kWh`), so savings, payback, and a 25-year projection land in their currency
+  with no tariff tables.
+- **Never dead-ends** — manual-entry fallback, typed error/retry states, and graceful
+  degradation when any external API is unavailable.
+- **Operator dashboard** — captured leads, filtering/search, and a full detail view
+  (estimate, extracted bill data, roof map, original bill preview) behind admin auth.
+
+## How it works
+
+1. **Upload** a bill (drag-drop or mobile camera) → a live progress dialog during extraction.
+2. **Review** the numbers we read, with low-confidence fields flagged and editable.
+3. **Locate** the roof on a draggable satellite-map pin.
+4. **Results** — the money screen: system size, annual/monthly savings, payback, 25-year
+   chart. A soft CTA opens the lead form.
+
+**Stack:** Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 ·
+shadcn/ui · Prisma + Neon Postgres · Vercel Blob · Better Auth · Mistral OCR · OpenAI ·
+Google Maps · PVGIS / NASA POWER · Upstash rate limiting. Full plan and rationale in
+[docs/PLAN.md](docs/PLAN.md).
 
 ## Setup
 
@@ -40,6 +72,16 @@ production database on every deploy (requires a valid `DATABASE_URL`).
 ```bash
 npm run dev
 ```
+
+### Deploying
+
+The app is deployed on **Vercel** from the `main` branch (push to deploy). The
+`vercel-build` script runs `prisma migrate deploy` before the build, so schema
+migrations reach the database automatically. Set the runtime env vars in Vercel —
+at minimum `DATABASE_URL`, the extraction/maps keys, and (for the admin dashboard)
+`BETTER_AUTH_SECRET` + `BETTER_AUTH_URL`. Seed the admin account once against the
+production database with `npm run seed:admin` (see [Lead capture + admin
+dashboard](#lead-capture--admin-dashboard-phase-5)).
 
 ## Bill upload + extraction (Phase 2.1 + 2.2)
 
@@ -149,7 +191,8 @@ npm run seed:admin
 ```
 
 The script talks to Better Auth's internal adapter directly, so it works even though the
-public sign-up endpoint is closed. Re-running it resets the admin password.
+public sign-up endpoint is closed. Re-running it resets the admin password. Sign in at
+**`/admin/login`** (also reachable via a discreet link in the site footer).
 
 ## Environment variables
 
