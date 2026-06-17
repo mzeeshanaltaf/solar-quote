@@ -65,6 +65,7 @@ type Step =
   | "manual"
   | "review"
   | "location"
+  | "irradiance"
   | "done";
 
 // Drives the eyebrow step indicator. The funnel is four user-facing steps;
@@ -78,6 +79,7 @@ const STEP_META: Record<Step, string> = {
   manual: "Step 2 of 4 · Your bill",
   review: "Step 2 of 4 · Your bill",
   location: "Step 3 of 4 · Your roof",
+  irradiance: "Step 3 of 4 · Your roof",
   done: "Step 3 of 4 · Your roof",
 };
 
@@ -269,12 +271,33 @@ export function EstimateFunnel() {
     }
   };
 
+  // Pin confirmed: resolve the roof's solar irradiance, then land on done.
+  // Non-blocking by design — if the lookup fails we store nothing and still
+  // advance; Phase 4 handles the missing-yield fallback.
+  const handleLocated = async () => {
+    setStep("irradiance");
+    if (sessionId) {
+      try {
+        await fetch("/api/irradiance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+      } catch {
+        // Swallow — the funnel must reach the results regardless.
+      }
+    }
+    setStep("done");
+  };
+
   const heading = () => {
     switch (step) {
       case "review":
         return "Here’s what we found.";
       case "location":
         return "Find your roof.";
+      case "irradiance":
+        return "Checking your sunlight.";
       case "done":
         return "Saved. Sizing your system next.";
       case "failed":
@@ -440,9 +463,16 @@ export function EstimateFunnel() {
       {step === "location" && sessionId && (
         <LocationStep
           sessionId={sessionId}
-          onConfirmed={() => setStep("done")}
+          onConfirmed={handleLocated}
           onReset={reset}
         />
+      )}
+
+      {step === "irradiance" && (
+        <div className="flex items-center justify-center gap-2.5 rounded-2xl border border-border bg-muted/40 py-20 text-muted-foreground">
+          <Loader2Icon className="size-5 animate-spin text-primary" />
+          <span className="text-sm">Checking the sunlight at your roof…</span>
+        </div>
       )}
 
       {step === "done" && (

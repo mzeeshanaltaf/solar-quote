@@ -1,11 +1,15 @@
 # SolarQuote Phase 3 — Location + Irradiance
 
-> **Status (2026-06-14): Phase 3.1 ✅ built · Phase 3.2 planned.**
+> **Status (2026-06-17): Phase 3.1 ✅ built · Phase 3.2 ✅ built.**
 > Split into two shippable sub-phases: **3.1** geocode route + map step UI
 > (`/api/geocode`, `location-step.tsx`, funnel wired, `@vis.gl/react-google-maps`
-> installed — build + lint clean); **3.2** irradiance route + cache (planned).
-> Verified locally per the Verification section, except the live map/geocode
-> spot-checks which need real Google Maps keys set.
+> installed); **3.2** irradiance route + cache (`IrradianceCache` model +
+> `0005_irradiance_cache` migration, `lib/irradiance.ts` PVGIS→NASA fallback,
+> `/api/irradiance`, funnel fires it non-blocking after the pin is confirmed).
+> Both build + lint + `prisma validate` clean. Verified locally per the
+> Verification section, except the live map/geocode spot-checks (need real
+> Google Maps keys) and the PVGIS/NASA yield spot-checks (need a provisioned DB
+> to run the funnel end-to-end).
 
 ## Context
 

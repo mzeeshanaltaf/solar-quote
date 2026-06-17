@@ -69,6 +69,21 @@ model QuoteSession {
   @@index([status, createdAt])
 }
 
+// Solar irradiance (specific yield) cached by rounded lat/lng so nearby
+// sessions share one upstream PVGIS/NASA call. The key is lat/lng rounded to
+// 2 dp (~1.1 km) — fine for sizing, and far fewer distinct upstream requests.
+model IrradianceCache {
+  id            String   @id @default(cuid())
+  latKey        Float // lat rounded to 2 dp (~1.1 km)
+  lngKey        Float // lng rounded to 2 dp
+  specificYield Float // kWh/kWp/yr
+  source        String // "pvgis" | "nasa"
+  raw           Json // upstream payload, for debugging
+  createdAt     DateTime @default(now())
+
+  @@unique([latKey, lngKey])
+}
+
 model Lead {
   id               String     @id @default(cuid())
   name             String
