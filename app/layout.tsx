@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Albert_Sans, Young_Serif } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import { SITE_URL } from "@/lib/site";
 
 const albertSans = Albert_Sans({
   variable: "--font-albert-sans",
@@ -15,9 +16,7 @@ const youngSerif = Young_Serif({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
-  ),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "SolarQuote — Your bill already knows if solar is worth it",
     template: "%s · SolarQuote",

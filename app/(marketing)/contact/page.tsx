@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Contact",
   description:
     "Suggestions, improvements, or questions about SolarQuote. We read everything.",
+  alternates: { canonical: "/contact" },
 };
 
 const ERROR_MESSAGES: Record<string, string> = {

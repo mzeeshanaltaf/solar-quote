@@ -115,6 +115,7 @@ Copy [.env.example](.env.example) to `.env` and fill in the values.
 
 | Variable | Purpose |
 |---|---|
+| `NEXT_PUBLIC_SITE_URL` | Canonical site origin for `metadataBase`, `robots.txt`, `sitemap.xml`, canonical tags, and OG/Twitter image URLs. Set to your production domain (defaults to `http://localhost:3000`). |
 | `OPENAI_EXTRACTION_MODEL` | Override the extraction model (defaults to `gpt-5.4-mini`). |
 | `NEXT_PUBLIC_EXTRACTION_MODE` | Set to `vision` to use the single-call vision extraction path. |
 | `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | Vector map ID for the map marker (falls back to a demo map). |

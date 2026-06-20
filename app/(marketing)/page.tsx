@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRightIcon } from "lucide-react";
 
@@ -94,9 +95,30 @@ function BillArtifact() {
   );
 }
 
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
+
+// FAQ rich-result schema, built from the same copy rendered below so the two
+// can't drift. Organization + WebSite schema lives site-wide in the marketing
+// layout.
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map((faq) => ({
+    "@type": "Question",
+    name: faq.q,
+    acceptedAnswer: { "@type": "Answer", text: faq.a },
+  })),
+};
+
 export default function LandingPage() {
   return (
     <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        />
         {/* Hero */}
         <section
           aria-labelledby="hero-heading"

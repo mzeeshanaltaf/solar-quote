@@ -3,7 +3,10 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Estimate",
+  title: "Get your solar estimate",
+  description:
+    "Upload your electricity bill and get a free solar estimate: system size, annual savings in your own currency, and payback time. No sign-up.",
+  alternates: { canonical: "/estimate" },
 };
 
 export default function EstimateLayout({

@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Terms of service",
   description:
     "The terms that apply when you use SolarQuote to estimate solar savings from your electricity bill.",
+  alternates: { canonical: "/terms" },
 };
 
 export default function TermsPage() {

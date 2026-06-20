@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Privacy policy",
   description:
     "How SolarQuote handles your electricity bill, the data we read from it, and how to have it deleted.",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {
