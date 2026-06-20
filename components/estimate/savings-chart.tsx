@@ -174,7 +174,12 @@ export function SavingsChart({ projection, systemCost, currency }: SavingsChartP
           <text
             x={paybackX}
             y={costY - 18}
-            textAnchor={paybackX > W * 0.7 ? "end" : "middle"}
+            // Anchor toward the chart interior so the label never crosses the
+            // SVG edge and gets clipped: start it from the marker when payback
+            // is early (near the left), end it at the marker when it's late.
+            textAnchor={
+              paybackX < W * 0.3 ? "start" : paybackX > W * 0.7 ? "end" : "middle"
+            }
             className="fill-foreground"
             style={{ fontSize: 21, fontWeight: 600 }}
           >
