@@ -354,6 +354,13 @@ export function EstimateFunnel() {
     }
   };
 
+  // No confirmed pin (map unavailable, or the user couldn't find their roof):
+  // skip irradiance entirely and size from the regional fallback yield. The
+  // results view discloses that the sunlight figure is a regional estimate.
+  const handleSkipLocation = () => {
+    if (sessionId) void runEstimate(sessionId);
+  };
+
   const heading = () => {
     switch (step) {
       case "review":
@@ -544,6 +551,7 @@ export function EstimateFunnel() {
           sessionId={sessionId}
           onConfirmed={handleLocated}
           onReset={reset}
+          onSkip={handleSkipLocation}
         />
       )}
 

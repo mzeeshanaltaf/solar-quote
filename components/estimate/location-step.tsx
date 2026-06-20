@@ -9,6 +9,7 @@ import {
 } from "@vis.gl/react-google-maps";
 import {
   AlertCircleIcon,
+  ArrowRightIcon,
   CheckCircle2Icon,
   MapPinIcon,
   RotateCcwIcon,
@@ -57,6 +58,10 @@ interface LocationStepProps {
   sessionId: string;
   onConfirmed: () => void;
   onReset: () => void;
+  /** Proceed without a confirmed pin — the estimate falls back to a regional
+   *  yield. Keeps the funnel moving when the map is unavailable or the user
+   *  simply can't find their roof. */
+  onSkip: () => void;
 }
 
 // Imperatively re-centers the map whenever `target` changes (initial geocode or
@@ -72,7 +77,12 @@ function MapPanner({ target }: { target: Pin | null }) {
   return null;
 }
 
-export function LocationStep({ sessionId, onConfirmed, onReset }: LocationStepProps) {
+export function LocationStep({
+  sessionId,
+  onConfirmed,
+  onReset,
+  onSkip,
+}: LocationStepProps) {
   const [pin, setPin] = useState<Pin | null>(null);
   const [flyTarget, setFlyTarget] = useState<Pin | null>(null);
   const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
@@ -176,27 +186,38 @@ export function LocationStep({ sessionId, onConfirmed, onReset }: LocationStepPr
     }
   };
 
-  // The browser map key is required to render anything. Without it we still let
-  // the user proceed isn't possible — surface a clear, non-dead-end message.
+  // The browser map key is required to render the map. Without it we can't pin
+  // the roof — but the estimate still works off a regional sunlight average, so
+  // we offer to continue rather than dead-end the funnel.
   if (!MAPS_API_KEY) {
     return (
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-xl">Find your roof</CardTitle>
+          <CardDescription>
+            We couldn&apos;t load the map here — but we can still estimate your savings
+            from the sunlight typical for your area.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Alert variant="destructive">
-            <AlertCircleIcon />
-            <AlertTitle>Map unavailable</AlertTitle>
-            <AlertDescription>
-              The map isn&apos;t configured in this environment. Add a Google Maps browser
-              key to continue.
+        <CardContent className="flex flex-col gap-5">
+          <Alert className="border-primary/30 bg-primary/4 text-foreground">
+            <MapPinIcon className="text-primary" />
+            <AlertTitle>Map unavailable right now</AlertTitle>
+            <AlertDescription className="text-muted-foreground">
+              No need to pinpoint your roof — we&apos;ll use the average sunlight for your
+              region. The numbers stay close; a precise pin only fine-tunes them.
             </AlertDescription>
           </Alert>
-          <Button type="button" variant="ghost" className="mt-5" onClick={onReset}>
-            <RotateCcwIcon data-icon="inline-start" />
-            Start over
-          </Button>
+          <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <Button type="button" variant="ghost" onClick={onReset}>
+              <RotateCcwIcon data-icon="inline-start" />
+              Start over
+            </Button>
+            <Button type="button" size="lg" onClick={onSkip}>
+              Continue to my estimate
+              <ArrowRightIcon data-icon="inline-end" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -325,6 +346,17 @@ export function LocationStep({ sessionId, onConfirmed, onReset }: LocationStepPr
             {saveStatus === "saving" ? "Saving" : "This is my roof"}
           </Button>
         </div>
+
+        {/* Last-resort escape so a roof you can't find never blocks the estimate;
+            sizing falls back to the average sunlight for your region. */}
+        <button
+          type="button"
+          onClick={onSkip}
+          disabled={saveStatus === "saving"}
+          className="self-center text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground disabled:opacity-50"
+        >
+          Can&apos;t find your roof? Estimate from my area instead
+        </button>
       </CardContent>
     </Card>
   );

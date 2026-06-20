@@ -6,8 +6,9 @@ import { LeadStatus } from "@/generated/client";
 import { leadRatelimit, getClientIp } from "@/lib/ratelimit";
 
 // Honeypot field — meaningless name so Chrome autofill never touches it, while
-// naive bots fill it like any other input. Mirrors /api/contact.
-const HONEYPOT_FIELD = "company_url";
+// naive bots fill it like any other input. Mirrors /api/contact. Avoid tokens
+// browsers autofill ("company"/"url"/"email"/…) or real users get flagged.
+const HONEYPOT_FIELD = "referral_token";
 
 const PREFERRED = ["email", "phone", "whatsapp"] as const;
 
@@ -159,7 +160,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Best-effort notify (n8n) — never block or fail the lead on a webhook hiccup.
-  const webhookUrl = process.env.N8N_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_LEAD_WEBHOOK_URL;
   const apiKey = process.env.N8N_API_KEY;
   if (webhookUrl && apiKey) {
     try {
@@ -172,6 +173,7 @@ export async function POST(req: NextRequest) {
           email,
           phone: phone || null,
           preferredContact: preferredContact || null,
+          notes: notes || null,
           submittedAt: new Date().toISOString(),
           source: "solarquote-lead-form",
         }),

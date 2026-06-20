@@ -31,8 +31,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
-// Must match HONEYPOT_FIELD in app/api/leads/route.ts.
-const HONEYPOT_FIELD = "company_url";
+// Honeypot input. Must match HONEYPOT_FIELD in app/api/leads/route.ts.
+// Name has no autofill heuristic (avoid "company"/"url"/"email"/etc.) so Chrome
+// autofill never populates it — otherwise real submissions get flagged as bots.
+const HONEYPOT_FIELD = "referral_token";
 
 type Status = "idle" | "loading" | "success" | "error";
 

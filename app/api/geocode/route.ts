@@ -169,7 +169,13 @@ export async function POST(req: NextRequest) {
     const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
     url.searchParams.set("address", query);
     url.searchParams.set("key", apiKey);
-    const res = await fetch(url, { cache: "no-store" });
+    // Bound the upstream call so a hung Google request can't stall the funnel —
+    // a timeout aborts and is handled as a geocode failure (the UI falls back to
+    // the search box). Mirrors lib/irradiance.ts.
+    const res = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
     data = (await res.json()) as GoogleGeocodeResponse;
   } catch (err) {
     console.error("Geocoding request failed", err);

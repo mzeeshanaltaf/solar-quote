@@ -119,7 +119,7 @@ Copy [.env.example](.env.example) to `.env` and fill in the values.
 | `NEXT_PUBLIC_EXTRACTION_MODE` | Set to `vision` to use the single-call vision extraction path. |
 | `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | Vector map ID for the map marker (falls back to a demo map). |
 | `BLOB_STORE_ID` | Vercel Blob store ID, if your setup requires it. |
-| `N8N_WEBHOOK_URL`, `N8N_API_KEY` | Webhook to notify on new leads / contact messages. |
+| `N8N_LEAD_WEBHOOK_URL`, `N8N_CONTACT_WEBHOOK_URL`, `N8N_API_KEY` | Webhooks to notify on new leads / contact messages (separate webhook per channel; shared API key). |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis for rate limiting (fails open if unset). |
 
 ### Seed-only

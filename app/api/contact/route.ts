@@ -104,10 +104,10 @@ export async function POST(req: NextRequest) {
     return fail(parsed.error.issues[0]?.message ?? "fields");
   }
 
-  const webhookUrl = process.env.N8N_WEBHOOK_URL;
+  const webhookUrl = process.env.N8N_CONTACT_WEBHOOK_URL;
   const apiKey = process.env.N8N_API_KEY;
   if (!webhookUrl || !apiKey) {
-    console.error("Contact form: N8N_WEBHOOK_URL or N8N_API_KEY is not set");
+    console.error("Contact form: N8N_CONTACT_WEBHOOK_URL or N8N_API_KEY is not set");
     return fail("server");
   }
 

@@ -24,7 +24,7 @@ A homeowner uploads an electricity bill (PDF/photo). The system extracts consump
 
 | Skill | Used in | Purpose |
 |---|---|---|
-| `/impeccable` | Phases 1, 4, 6 | Warm-editorial design system, results page, final polish |
+| `/impeccable` | Phases 1, 4, 6.2 | Warm-editorial design system, results page, final polish |
 | `/frontend-design` | Phases 1, 4 | Distinctive non-AI-slop visual execution |
 | `/shadcn` | Phases 1, 2, 5 | Component scaffolding (forms, tables, dialogs, sheets) |
 | `/nextjs-best-practices` | All phases | App Router patterns, Server/Client component boundaries |
@@ -37,7 +37,7 @@ A homeowner uploads an electricity bill (PDF/photo). The system extracts consump
 | `/nextjs-progressive-form` | Phase 5 | Hydration-proof lead capture form |
 | `/better-auth-best-practices` | Phase 5 | Admin auth (email/password, middleware, seeding) |
 | `/pdf-preview` | Phase 5 | Inline bill preview in admin (react-pdf, base64) |
-| `/seo-audit` | Phase 6 | Pre-launch technical SEO pass on marketing + results pages |
+| `/seo-audit` | Phase 6.5 | Pre-launch technical SEO pass on marketing + results pages |
 
 ## Architecture
 
@@ -130,13 +130,36 @@ docs/PLAN.md                         # this document
 3. Admin dashboard (shadcn data table, sheet, dialog): leads list (filter by status/date, search), lead detail view — extracted bill data, estimate summary, map thumbnail, original bill preview per `/pdf-preview` (react-pdf for PDFs; `<img>` for photo bills), status dropdown + notes.
 
 ### Phase 6 — Hardening + Launch
-> **Skills:** `/seo-audit`, `/vercel-react-best-practices`, `/impeccable`
+> **Skills:** `/vercel-react-best-practices`, `/impeccable`, `/seo-audit`
 
-1. Error states for every external call (OCR fail → manual entry; geocode fail → search box; PVGIS fail → NASA POWER → regional constant).
-2. Mobile polish pass on the full funnel via `/impeccable` (upload-by-camera is the dominant global path).
-3. Run `/seo-audit` on the marketing page: meta/OG tags, sitemap, structured data, Core Web Vitals; fix findings. Legal pages (privacy — bills are PII; data-deletion contact).
-4. Performance pass per `/vercel-react-best-practices` (bundle analysis, image optimization, lazy boundaries).
-5. Deploy to Vercel, production env vars, end-to-end smoke test with a real bill.
+Broken into sub-phases — each a discrete, shippable unit. `/seo-audit` runs last, against the live deployment.
+
+#### Phase 6.1 — Resilience / graceful degradation ✅ (as built)
+> **Skills:** `/vercel-react-best-practices`
+
+Error states for every external call: OCR fail → manual entry; geocode fail → search box; PVGIS fail → NASA POWER → regional constant. The funnel never dead-ends.
+
+Most of the chain was already in place from Phases 2–4 (the `FAILURE_COPY` failure step → manual entry; `getSpecificYield`'s PVGIS→NASA fallback; a null `specificYield` making `computeEstimate` use `fallbackSpecificYield`, disclosed on the results page as "estimated for your region"). 6.1 closed the two remaining gaps: (1) the location step no longer dead-ends — a `onSkip` escape ("Estimate from my area instead", and a "Continue to my estimate" CTA when the browser Maps key is missing) proceeds straight to a regional-fallback estimate without a pin; (2) `/api/geocode` now bounds its upstream call with `AbortSignal.timeout(15s)`, matching `lib/irradiance.ts`, so a hung Google request can't stall the funnel.
+
+#### Phase 6.2 — Mobile polish pass
+> **Skills:** `/impeccable`
+
+Full-funnel mobile polish via `/impeccable` — upload-by-camera is the dominant global path.
+
+#### Phase 6.3 — Performance pass
+> **Skills:** `/vercel-react-best-practices`
+
+Bundle analysis, image optimization, lazy boundaries.
+
+#### Phase 6.4 — Launch
+> **Skills:** `/vercel-react-best-practices`
+
+Legal pages (privacy — bills are PII; data-deletion contact) so privacy is live at launch. Deploy to Vercel with production env vars; end-to-end smoke test with a real bill.
+
+#### Phase 6.5 — SEO audit *(final)*
+> **Skills:** `/seo-audit`
+
+Run `/seo-audit` on the marketing + results pages: meta/OG tags, sitemap, structured data, Core Web Vitals; fix findings, verified against the live deployment.
 
 ## Verification
 - **Per phase:** `npm run build` clean; `npx prisma validate`/`migrate dev` clean.
@@ -144,4 +167,4 @@ docs/PLAN.md                         # this document
 - **Phase 3:** spot-check specific yield for 3 known cities (Lahore ≈ 1500+, Berlin ≈ 1000, Phoenix ≈ 1700 kWh/kWp/yr) against PVGIS web tool.
 - **Phase 4:** unit tests for `solar-math.ts` (`vitest`) — known inputs → known payback; sanity-check a full funnel run.
 - **Phase 5:** submit a lead end-to-end, verify it appears in admin with bill preview; verify `/admin` redirects when unauthenticated.
-- **Phase 6:** Lighthouse mobile run on landing + results; full funnel on a real phone (camera upload).
+- **Phase 6.2 / 6.4:** full funnel on a real phone (camera upload). **Phase 6.5:** Lighthouse mobile run on landing + results.
