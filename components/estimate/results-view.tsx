@@ -135,6 +135,12 @@ export function ResultsView({
 
   const offsetPct = Math.round(est.consumptionOffset * 100);
   const currency = est.currency;
+  // Past 100% the array generates more than the home uses. The conservative
+  // model values only self-consumed power, so savings hold flat while size and
+  // cost climb — we surface that surplus explicitly so the number doesn't look
+  // stuck.
+  const overBuilt = offset > 1;
+  const surplusPct = Math.round((offset - 1) * 100);
 
   return (
     <div className="flex flex-col gap-10">
@@ -154,9 +160,20 @@ export function ResultsView({
           <span className="font-medium text-foreground">
             {formatMoney(est.monthlySavings, currency)}
           </span>{" "}
-          a month, covering roughly{" "}
-          <span className="font-medium text-foreground">{offsetPct}%</span> of the
-          electricity you use, generated on your own roof.
+          a month.{" "}
+          {overBuilt ? (
+            <>
+              That covers all the electricity you use, with about{" "}
+              <span className="font-medium text-foreground">{surplusPct}%</span> to
+              spare for export.
+            </>
+          ) : (
+            <>
+              That covers roughly{" "}
+              <span className="font-medium text-foreground">{offsetPct}%</span> of the
+              electricity you use, generated on your own roof.
+            </>
+          )}
         </p>
       </Reveal>
 
@@ -204,10 +221,23 @@ export function ResultsView({
               </span>
             ))}
           </div>
-          <p className="text-sm text-muted-foreground">
-            A smaller system costs less but covers less; going past 100% rarely pays
-            off, since extra power you don&apos;t use only earns export credits.
-          </p>
+          {overBuilt ? (
+            <p className="rounded-xl bg-primary/5 px-4 py-3 text-sm text-foreground">
+              Your panels now make about{" "}
+              <span className="font-medium">{surplusPct}% more</span> than you use, so
+              your yearly saving holds at{" "}
+              <span className="font-medium">
+                {formatMoney(est.annualSavings, currency)}
+              </span>
+              . We only count the power you actually use; the extra is exported for
+              credits we leave out to stay conservative.
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              A smaller system costs less but covers less; going past 100% rarely pays
+              off, since extra power you don&apos;t use only earns export credits.
+            </p>
+          )}
         </div>
       </Reveal>
 
