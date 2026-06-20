@@ -17,7 +17,7 @@ export default function PrivacyPage() {
         Your bill is yours. Here is exactly what we do with it.
       </h1>
       <p className="mt-4 text-sm text-muted-foreground">
-        Last updated June 12, 2026
+        Last updated June 20, 2026
       </p>
 
       <div className="mt-12 flex max-w-[70ch] flex-col gap-10 leading-relaxed">
@@ -47,8 +47,10 @@ export default function PrivacyPage() {
           <p className="mt-3 text-muted-foreground">
             One thing: producing your solar estimate. Your bill is processed by
             our document-reading providers (OCR and language-model services)
-            solely to extract the fields above. Your roof location is sent to
-            public solar irradiance services (PVGIS, NASA POWER) as
+            solely to extract the fields above. The service address from your
+            bill is sent to Google Maps to place a pin and load satellite
+            imagery so you can confirm your roof. Your roof location is then sent
+            to public solar irradiance services (PVGIS, NASA POWER) as
             coordinates, never with your name or bill attached.
           </p>
           <p className="mt-3 text-muted-foreground">
