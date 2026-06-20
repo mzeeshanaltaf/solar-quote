@@ -40,6 +40,10 @@ export function MapThumbnail({ lat, lng, label }: MapThumbnailProps) {
       <img
         src={src}
         alt={`Satellite view of ${label || "the roof"}`}
+        width={1280}
+        height={640}
+        loading="lazy"
+        decoding="async"
         className="aspect-2/1 w-full object-cover"
         onError={() => setFailed(true)}
       />

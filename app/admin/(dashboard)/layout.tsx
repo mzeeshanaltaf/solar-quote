@@ -32,7 +32,13 @@ export default async function AdminDashboardLayout({
             aria-label="SolarQuote home"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.svg" alt="SolarQuote" className="h-8 w-auto" />
+            <img
+              src="/logo.svg"
+              alt="SolarQuote"
+              width={1260}
+              height={441}
+              className="h-8 w-auto"
+            />
             <span className="hidden text-sm font-medium text-muted-foreground sm:inline">
               Lead dashboard
             </span>

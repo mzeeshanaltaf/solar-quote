@@ -35,7 +35,12 @@ function ImageView({ url }: { url: string }) {
   return (
     <div className="max-h-[70vh] overflow-y-auto p-3">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="Original bill" className="mx-auto h-auto w-full rounded-lg" />
+      <img
+        src={url}
+        alt="Original bill"
+        decoding="async"
+        className="mx-auto h-auto w-full rounded-lg"
+      />
     </div>
   );
 }

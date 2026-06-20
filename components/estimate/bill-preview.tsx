@@ -40,6 +40,7 @@ function ImagePreview({ file }: { file: File }) {
       <img
         src={url}
         alt="Your uploaded bill"
+        decoding="async"
         className="mx-auto h-auto w-full rounded-lg"
       />
     </div>

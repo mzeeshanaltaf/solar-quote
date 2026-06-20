@@ -22,7 +22,13 @@ export default async function AdminLoginPage() {
         <div className="flex flex-col items-center gap-5 text-center">
           <Link href="/" aria-label="SolarQuote home" className="inline-flex">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.svg" alt="SolarQuote" className="h-11 w-auto" />
+            <img
+              src="/logo.svg"
+              alt="SolarQuote"
+              width={1260}
+              height={441}
+              className="h-11 w-auto"
+            />
           </Link>
           <div className="flex flex-col gap-1.5">
             <h1 className="text-3xl">Operator sign in</h1>
