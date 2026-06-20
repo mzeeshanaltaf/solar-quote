@@ -98,7 +98,7 @@ export function SavingsChart({ projection, systemCost, currency }: SavingsChartP
           y={H - 12}
           textAnchor="middle"
           className="fill-muted-foreground"
-          style={{ fontSize: 13 }}
+          style={{ fontSize: 22 }}
         >
           {t}y
         </text>
@@ -118,10 +118,10 @@ export function SavingsChart({ projection, systemCost, currency }: SavingsChartP
           />
           <text
             x={W - PAD.right}
-            y={costY - 8}
+            y={costY - 11}
             textAnchor="end"
             className="fill-muted-foreground"
-            style={{ fontSize: 13, fontWeight: 500 }}
+            style={{ fontSize: 21, fontWeight: 500 }}
           >
             System cost ≈ {formatMoney(systemCost!, currency)}
           </text>
@@ -140,7 +140,7 @@ export function SavingsChart({ projection, systemCost, currency }: SavingsChartP
         d={linePath}
         fill="none"
         stroke="var(--primary)"
-        strokeWidth="2.5"
+        strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
         initial={reduce ? false : { pathLength: 0 }}
@@ -163,20 +163,20 @@ export function SavingsChart({ projection, systemCost, currency }: SavingsChartP
           <motion.circle
             cx={paybackX}
             cy={costY}
-            r="5"
+            r="7"
             fill="var(--primary)"
             stroke="var(--background)"
-            strokeWidth="2"
+            strokeWidth="2.5"
             initial={reduce ? false : { scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 1, type: "spring", stiffness: 300, damping: 18 }}
           />
           <text
             x={paybackX}
-            y={costY - 14}
+            y={costY - 18}
             textAnchor={paybackX > W * 0.7 ? "end" : "middle"}
             className="fill-foreground"
-            style={{ fontSize: 13, fontWeight: 600 }}
+            style={{ fontSize: 21, fontWeight: 600 }}
           >
             Pays for itself · year {paybackYearLabel}
           </text>
@@ -186,10 +186,10 @@ export function SavingsChart({ projection, systemCost, currency }: SavingsChartP
       {/* lifetime total at the end of the curve */}
       <text
         x={W - PAD.right}
-        y={Math.max(yFor(lifetime) - 10, PAD.top)}
+        y={Math.max(yFor(lifetime) - 12, PAD.top + 4)}
         textAnchor="end"
         className="fill-primary"
-        style={{ fontSize: 15, fontWeight: 700 }}
+        style={{ fontSize: 26, fontWeight: 700 }}
       >
         {formatMoney(lifetime, currency)}
       </text>

@@ -141,10 +141,16 @@ Error states for every external call: OCR fail → manual entry; geocode fail �
 
 Most of the chain was already in place from Phases 2–4 (the `FAILURE_COPY` failure step → manual entry; `getSpecificYield`'s PVGIS→NASA fallback; a null `specificYield` making `computeEstimate` use `fallbackSpecificYield`, disclosed on the results page as "estimated for your region"). 6.1 closed the two remaining gaps: (1) the location step no longer dead-ends — a `onSkip` escape ("Estimate from my area instead", and a "Continue to my estimate" CTA when the browser Maps key is missing) proceeds straight to a regional-fallback estimate without a pin; (2) `/api/geocode` now bounds its upstream call with `AbortSignal.timeout(15s)`, matching `lib/irradiance.ts`, so a hung Google request can't stall the funnel.
 
-#### Phase 6.2 — Mobile polish pass
+#### Phase 6.2 — Mobile polish pass ✅ (as built)
 > **Skills:** `/impeccable`
 
 Full-funnel mobile polish via `/impeccable` — upload-by-camera is the dominant global path.
+
+The funnel was already structurally responsive (single-column stacking, `flex-col-reverse` action rows, lazy step bundles). 6.2 closed the touch + legibility gaps against PRODUCT.md's "touch targets ≥ 44px in the funnel" rule:
+- **Touch targets.** Bumped the shared `lg` button to `h-11` (44px) — it's the prominent consumer-CTA size used across the funnel, marketing, and auth. Promoted the dropzone "Choose a file" / "Take a photo" buttons (the dominant mobile path) and the location search button/input to that size, and extended the offset-slider thumb's hit area to ~44px via a pseudo-element (visual unchanged). PDF pagination controls enlarged to 40px.
+- **Chart legibility.** The hand-built SVG `savings-chart` plots in a 720-unit viewBox that scales down to ~5–6px text on a phone; bumped label font sizes (ticks/labels 21–22, lifetime total 26), line weight, and the payback marker so they stay readable when scaled.
+- **Hero overflow.** Lowered the results headline clamp floor (`clamp(2.25rem,10vw,5.5rem)` + `text-balance`) so large-value currencies (PKR/IDR) don't overflow narrow screens.
+- **Mobile chrome.** Added a root `viewport` export: warm `themeColor` (`#faf7f0`) tinting the browser bar to the paper background, and `colorScheme: light` so iOS Safari never dark-inverts the daylight-only funnel's form controls.
 
 #### Phase 6.3 — Performance pass
 > **Skills:** `/vercel-react-best-practices`

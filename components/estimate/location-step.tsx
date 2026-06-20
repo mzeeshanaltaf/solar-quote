@@ -296,8 +296,15 @@ export function LocationStep({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             aria-label="Search for an address"
+            className="h-11"
           />
-          <Button type="submit" variant="outline" disabled={searching || !searchQuery.trim()}>
+          <Button
+            type="submit"
+            size="lg"
+            variant="outline"
+            disabled={searching || !searchQuery.trim()}
+            className="w-full sm:w-auto"
+          >
             {searching ? (
               <Spinner data-icon="inline-start" />
             ) : (

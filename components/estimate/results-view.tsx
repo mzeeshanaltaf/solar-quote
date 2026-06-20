@@ -143,7 +143,7 @@ export function ResultsView({
         <p className="text-sm font-medium text-muted-foreground">
           Based on the numbers from your own bill
         </p>
-        <p className="font-display text-[clamp(3rem,11vw,5.5rem)] leading-[0.95] text-primary tabular-nums">
+        <p className="font-display text-[clamp(2.25rem,10vw,5.5rem)] leading-[0.95] text-primary tabular-nums text-balance">
           <AnimatedValue
             value={est.annualSavings}
             format={(n) => formatMoney(n, currency)}

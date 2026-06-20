@@ -131,6 +131,7 @@ export function BillDropzone({ onFile, disabled, error }: BillDropzoneProps) {
         <div className="flex w-full flex-col items-center justify-center gap-2.5 sm:w-auto sm:flex-row sm:flex-wrap">
           <Button
             type="button"
+            size="lg"
             onClick={open}
             disabled={disabled}
             className="w-full sm:w-auto"
@@ -142,6 +143,7 @@ export function BillDropzone({ onFile, disabled, error }: BillDropzoneProps) {
               first-class button rather than burying it in the file picker. */}
           <Button
             type="button"
+            size="lg"
             variant="outline"
             onClick={() => cameraInputRef.current?.click()}
             disabled={disabled}

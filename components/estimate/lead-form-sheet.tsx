@@ -253,7 +253,7 @@ export function LeadFormSheet({ sessionId, open, onOpenChange }: LeadFormSheetPr
                 {status === "loading" ? "Sending" : "Connect me with installers"}
               </Button>
               <SheetClose asChild>
-                <Button type="button" variant="ghost">
+                <Button type="button" size="lg" variant="ghost">
                   Maybe later
                 </Button>
               </SheetClose>

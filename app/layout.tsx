@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Albert_Sans, Young_Serif } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
@@ -34,6 +34,14 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
   },
+};
+
+// Tints the mobile browser chrome to the warm paper background and pins the app
+// to its light, sunlit theme so iOS Safari never dark-inverts the funnel's form
+// controls. The funnel is daylight-only by design (see DESIGN.md).
+export const viewport: Viewport = {
+  themeColor: "#faf7f0",
+  colorScheme: "light",
 };
 
 export default function RootLayout({

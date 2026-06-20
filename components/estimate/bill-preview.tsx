@@ -98,8 +98,9 @@ function PdfPreview({ file }: { file: File }) {
         <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground">
           <Button
             type="button"
-            size="icon-sm"
+            size="icon"
             variant="outline"
+            className="size-10"
             onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
             disabled={pageNumber <= 1}
             aria-label="Previous page"
@@ -111,8 +112,9 @@ function PdfPreview({ file }: { file: File }) {
           </span>
           <Button
             type="button"
-            size="icon-sm"
+            size="icon"
             variant="outline"
+            className="size-10"
             onClick={() => setPageNumber((p) => Math.min(numPages, p + 1))}
             disabled={pageNumber >= numPages}
             aria-label="Next page"
