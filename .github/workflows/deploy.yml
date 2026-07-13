@@ -21,7 +21,7 @@ name: Deploy to Coolify
 #      every project on the same VPS uses the same value).
 
 env:
-  COOLIFY_URL: http://76.13.7.106:8000 # Coolify API on the Hostinger VPS
+  COOLIFY_URL: https://coolify.zeeshanai.cloud # Coolify API on the Hostinger VPS
 
 on:
   push:
