@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Albert_Sans, Young_Serif } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
+import Script from "next/script";
 import "./globals.css";
 import { SITE_URL } from "@/lib/site";
 
@@ -55,7 +55,14 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {children}
-        <Analytics />
+        {process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID &&
+          process.env.NEXT_PUBLIC_UMAMI_SCRIPT_URL && (
+            <Script
+              src={process.env.NEXT_PUBLIC_UMAMI_SCRIPT_URL}
+              data-website-id={process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID}
+              strategy="afterInteractive"
+            />
+          )}
       </body>
     </html>
   );
