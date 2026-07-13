@@ -6,7 +6,7 @@ Bill-to-solar-estimate lead-generation funnel. A homeowner uploads an electricit
 
 ## Stack
 
-- **Next.js 16** (App Router) + **React 19**, full-stack on Vercel. Turbopack by default.
+- **Next.js 16** (App Router) + **React 19**, full-stack. Self-hosted on a Hostinger VPS via **Coolify** (Docker/Nixpacks). Turbopack by default.
 - **TypeScript**, `@/*` path alias → project root.
 - **Tailwind v4** (CSS-first, configured in [app/globals.css](app/globals.css)) + **shadcn/ui** (Radix). Components in [components/ui/](components/ui/).
 - **Prisma 7** + **Neon Postgres** (pooled connection via `@prisma/adapter-pg`).
@@ -37,6 +37,6 @@ Warm-editorial "sunlight" direction — explicitly avoid the generic AI-SaaS loo
 
 ## Environment
 
-Phase 1 needs only `DATABASE_URL` (Neon **pooled** string — host contains `-pooler`). Later phases add Vercel Blob, Mistral OCR, OpenAI, Google Maps, Better Auth, Upstash, and n8n keys. See [.env.example](.env.example). Phase status is tracked in memory.
+Phase 1 needs only `DATABASE_URL` (Neon **pooled** string — host contains `-pooler`). Later phases add S3 object storage (self-hosted MinIO — `S3_*`), Mistral OCR, OpenAI, Google Maps, Better Auth, Upstash, and n8n keys. See [.env.example](.env.example). Phase status is tracked in memory.
 
-**Deployment:** live at https://solar-quote-nu.vercel.app, deployed from `main` on push. **Vercel's `DATABASE_URL` points at the same Neon database as local `.env`** — so local dev (and `npm run seed:admin`) writes to the production DB; there is no separate prod database. Runtime admin-auth env vars on Vercel: `BETTER_AUTH_SECRET` + `BETTER_AUTH_URL`. `ADMIN_EMAIL`/`ADMIN_PASSWORD`/`ADMIN_NAME` are seed-only (read by `scripts/seed-admin.ts`), not needed in Vercel.
+**Deployment:** self-hosted on a Hostinger VPS via **Coolify**, live at https://solarquote.zeeshanai.cloud, built from the repo `Dockerfile` (node:24-alpine). A push to `main` triggers a GitHub Actions workflow ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) that calls the Coolify deploy API. The container start command runs `prisma migrate deploy` before `next start`, so committed migrations auto-apply on deploy. **Coolify's `DATABASE_URL` points at the same Neon database as local `.env`** — so local dev (and `npm run seed:admin`) writes to the production DB; there is no separate prod database. Runtime env on Coolify: all secrets incl. `BETTER_AUTH_SECRET`/`BETTER_AUTH_URL` and `S3_*`. `ADMIN_EMAIL`/`ADMIN_PASSWORD`/`ADMIN_NAME` are seed-only (read by `scripts/seed-admin.ts`), not needed on Coolify. File storage is MinIO (S3-compatible) running as a Coolify service; the app reaches it over the internal Docker network.

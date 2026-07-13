@@ -35,8 +35,8 @@ database, currency comes from the bill itself.
 ## Tech stack
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 · shadcn/ui ·
-Prisma + Neon Postgres · Vercel Blob · Better Auth · Mistral OCR · OpenAI · Google Maps ·
-PVGIS / NASA POWER irradiance · Upstash rate limiting.
+Prisma + Neon Postgres · MinIO (S3) object storage · Better Auth · Mistral OCR · OpenAI ·
+Google Maps · PVGIS / NASA POWER irradiance · Upstash rate limiting · Coolify (self-hosted).
 
 ## Getting started
 
@@ -103,7 +103,7 @@ Copy [.env.example](.env.example) to `.env` and fill in the values.
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | Neon Postgres **pooled** connection string (host contains `-pooler`). |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob token — stores uploaded bills (private). |
+| `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | S3-compatible object storage (self-hosted MinIO) — stores uploaded bills (private). |
 | `MISTRAL_API_KEY` | Mistral OCR — turns bill files into text. |
 | `OPENAI_API_KEY` | OpenAI — extracts structured fields from the bill. |
 | `GOOGLE_MAPS_API_KEY` | Server-side key for the Geocoding API. |
@@ -119,7 +119,7 @@ Copy [.env.example](.env.example) to `.env` and fill in the values.
 | `OPENAI_EXTRACTION_MODEL` | Override the extraction model (defaults to `gpt-5.4-mini`). |
 | `NEXT_PUBLIC_EXTRACTION_MODE` | Set to `vision` to use the single-call vision extraction path. |
 | `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | Vector map ID for the map marker (falls back to a demo map). |
-| `BLOB_STORE_ID` | Vercel Blob store ID, if your setup requires it. |
+| `S3_BUCKET`, `S3_REGION`, `S3_FORCE_PATH_STYLE` | Object-storage bucket (default `bills`), region (default `us-east-1`), and path-style flag (`true` for MinIO). |
 | `N8N_LEAD_WEBHOOK_URL`, `N8N_CONTACT_WEBHOOK_URL`, `N8N_API_KEY` | Webhooks to notify on new leads / contact messages (separate webhook per channel; shared API key). |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis for rate limiting (fails open if unset). |
 
@@ -130,10 +130,14 @@ They are not needed at runtime — provide them wherever you run the seed comman
 
 ## Deployment
 
-Deployed on **Vercel** from the `main` branch (push to deploy). The `vercel-build` script
-runs `prisma migrate deploy` before building, so schema migrations reach the database
-automatically. Set the required environment variables in your Vercel project, then seed the
-admin account once against the production database (`npm run seed:admin`).
+Self-hosted on a **Hostinger VPS via Coolify**, built from the repo `Dockerfile`
+(node:24-alpine). A push to `main` triggers a GitHub Actions workflow
+(`.github/workflows/deploy.yml`) that calls the Coolify deploy API. The container start
+command runs `prisma migrate deploy` before `next start`, so schema migrations reach the
+database automatically on each deploy. Uploaded bills are stored in a MinIO
+(S3-compatible) service on the same box, reached over the internal Docker network. Set the
+environment variables in the Coolify app, then seed the admin account once against the
+production database (`npm run seed:admin`).
 
 ## Documentation
 
