@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 
+import { putBill } from "@/lib/storage";
 import { QuoteStatus } from "@/generated/client";
 import { prisma } from "@/lib/prisma";
 import { extractRatelimit, getClientIp } from "@/lib/ratelimit";
@@ -73,17 +73,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const ext = EXTENSION[file.type] ?? "bin";
-    // Bills are PII — store privately. The extract route reads the bytes back
-    // server-side (with the store token) to OCR them; the URL is never public.
-    const blob = await put(`bills/${crypto.randomUUID()}.${ext}`, file, {
-      access: "private",
-      contentType: file.type,
-    });
+    const key = `bills/${crypto.randomUUID()}.${ext}`;
+    // Bills are PII — store privately in MinIO. The extract/admin routes read the
+    // bytes back server-side; the object is never publicly reachable. We persist
+    // the object key (not a URL) as the bill reference.
+    const bytes = Buffer.from(await file.arrayBuffer());
+    await putBill(key, bytes, file.type);
 
     const session = await prisma.quoteSession.create({
       data: {
         status: QuoteStatus.UPLOADED,
-        blobUrl: blob.url,
+        blobUrl: key,
         fileMimeType: file.type,
       },
       select: { id: true },
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       sessionId: session.id,
-      blobUrl: blob.url,
+      blobUrl: key,
     });
   } catch (err) {
     console.error("Bill upload failed", err);

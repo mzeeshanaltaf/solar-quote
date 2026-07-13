@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { get } from "@vercel/blob";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
+import { getBillBytes } from "@/lib/storage";
 import { sessionRatelimit, getClientIp } from "@/lib/ratelimit";
 import { ExtractionError, ocrBill } from "@/lib/extraction";
 
@@ -61,9 +61,7 @@ export async function POST(req: NextRequest) {
   let markdown: string;
   try {
     // Read the bytes back from the private store, then OCR them as base64.
-    const file = await get(session.blobUrl, { access: "private" });
-    if (!file) return fail("no_file");
-    const buffer = Buffer.from(await new Response(file.stream).arrayBuffer());
+    const buffer = await getBillBytes(session.blobUrl);
     markdown = await ocrBill(buffer.toString("base64"), session.fileMimeType);
   } catch (err) {
     if (err instanceof ExtractionError) {

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { get } from "@vercel/blob";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getBillBytes } from "@/lib/storage";
 
 // Admin-only: stream a bill file back from the PRIVATE blob store so the
 // dashboard can preview it. Bills are PII and the blob URL is never public —
@@ -29,10 +29,8 @@ export async function GET(
   }
 
   try {
-    const file = await get(quote.blobUrl, { access: "private" });
-    if (!file) return new NextResponse("No bill on file", { status: 404 });
-    const bytes = await new Response(file.stream).arrayBuffer();
-    return new NextResponse(bytes, {
+    const bytes = await getBillBytes(quote.blobUrl);
+    return new NextResponse(new Uint8Array(bytes), {
       status: 200,
       headers: {
         "Content-Type": quote.fileMimeType ?? "application/octet-stream",

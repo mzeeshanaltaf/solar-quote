@@ -27,7 +27,7 @@ model QuoteSession {
   id     String      @id @default(cuid())
   status QuoteStatus @default(UPLOADED)
 
-  // Bill file (Vercel Blob)
+  // Bill file (MinIO / S3 object storage). `blobUrl` holds the object key.
   blobUrl      String?
   fileMimeType String?
 

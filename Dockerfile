@@ -35,8 +35,6 @@ ARG DATABASE_URL \
     MISTRAL_API_KEY \
     OPENAI_API_KEY \
     OPENAI_EXTRACTION_MODEL \
-    BLOB_READ_WRITE_TOKEN \
-    BLOB_STORE_ID \
     N8N_CONTACT_WEBHOOK_URL \
     N8N_LEAD_WEBHOOK_URL \
     N8N_API_KEY \
@@ -54,8 +52,6 @@ ENV DATABASE_URL=$DATABASE_URL \
     MISTRAL_API_KEY=$MISTRAL_API_KEY \
     OPENAI_API_KEY=$OPENAI_API_KEY \
     OPENAI_EXTRACTION_MODEL=$OPENAI_EXTRACTION_MODEL \
-    BLOB_READ_WRITE_TOKEN=$BLOB_READ_WRITE_TOKEN \
-    BLOB_STORE_ID=$BLOB_STORE_ID \
     N8N_CONTACT_WEBHOOK_URL=$N8N_CONTACT_WEBHOOK_URL \
     N8N_LEAD_WEBHOOK_URL=$N8N_LEAD_WEBHOOK_URL \
     N8N_API_KEY=$N8N_API_KEY \
@@ -70,4 +66,8 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+# Apply any pending DB migrations on start, then boot Next. This used to run via
+# Vercel's `vercel-build` (prisma migrate deploy); on Coolify the container start
+# is the migration hook. `migrate deploy` is idempotent and needs DATABASE_URL
+# (injected at runtime); a failed migration stops the container loudly.
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]

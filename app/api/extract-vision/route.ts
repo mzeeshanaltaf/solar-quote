@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { get } from "@vercel/blob";
 import { z } from "zod";
 
 import { QuoteStatus } from "@/generated/client";
 import { prisma } from "@/lib/prisma";
+import { getBillBytes } from "@/lib/storage";
 import { sessionRatelimit, getClientIp } from "@/lib/ratelimit";
 import {
   ExtractionError,
@@ -74,9 +74,7 @@ export async function POST(req: NextRequest) {
   let extracted: ExtractedBill;
   try {
     // Read the bytes back from the private store, then hand them to the model.
-    const file = await get(session.blobUrl, { access: "private" });
-    if (!file) return fail("no_file");
-    const buffer = Buffer.from(await new Response(file.stream).arrayBuffer());
+    const buffer = await getBillBytes(session.blobUrl);
     extracted = await extractFromFile(
       buffer.toString("base64"),
       session.fileMimeType
